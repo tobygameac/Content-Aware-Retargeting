@@ -6,7 +6,8 @@
 class Edge {
 public:
   Edge() {}
-  Edge(std::pair<int, int> e, int w) : e(e), w(w) {}
+  Edge(std::pair<int, int> e) : e(e) {}
+  Edge(std::pair<int, int> e, double w) : e(e), w(w) {}
 
   const bool operator <(const Edge &other) {
     if (w != other.w) { 

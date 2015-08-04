@@ -61,9 +61,9 @@ void GaussianSmoothing(ImageType &image, double sigma) {
   image = new_image;
 }
 
-GraphType BuildGraphFromImage(ImageType &image) {
-
-  GraphType G;
+void BuildGraphFromImage(ImageType &image, GraphType &G) {
+  G.V.clear();
+  G.E.clear();
 
   G.V.reserve(image.width * image.height);
   G.E.reserve(image.width * image.height * 4);
@@ -95,20 +95,18 @@ GraphType BuildGraphFromImage(ImageType &image) {
       }
     }
   }
-
-  return G;
 }
 
-void Segmentation(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_set, double sigma, double k, int min_patch_size, double similar_color_patch_merge_threshold) {
+void Segmentation(ImageType &image, GraphType &G, std::vector<std::vector<int> > &group_of_pixel, double sigma, double k, int min_patch_size, double similar_color_patch_merge_threshold) {
   GaussianSmoothing(image, sigma);
-    
+
   image.write_BMP_image("smooth.bmp");
 
-  G = BuildGraphFromImage(image);
+  BuildGraphFromImage(image, G);
 
   sort(G.E.begin(), G.E.end());
 
-  vertex_disjoint_set = DisjointSet(G.V.size());
+  DisjointSet vertex_disjoint_set(G.V.size());
 
   std::vector<double> threshold(G.V.size());
   for (auto it = threshold.begin(); it != threshold.end(); ++it) {
@@ -155,7 +153,6 @@ void Segmentation(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
     }
   }
 
-
   // Deal with the similar color set
   for (auto it = G.E.begin(); it != G.E.end(); ++it) {
     int group_of_x = vertex_disjoint_set.FindGroup(it->e.first);
@@ -178,6 +175,7 @@ void Segmentation(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
     it->g = 0;
     it->b = 0;
   }
+
   for (int r = 0; r < image.height; ++r) {
     for (int c = 0; c < image.width; ++c) {
       int index = r * image.width + c;
@@ -199,6 +197,17 @@ void Segmentation(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
       image.pixel[r][c].r = (unsigned char)group_color[group].r;
       image.pixel[r][c].g = (unsigned char)group_color[group].g;
       image.pixel[r][c].b = (unsigned char)group_color[group].b;
+    }
+  }
+
+  group_of_pixel.clear();
+  group_of_pixel = std::vector<std::vector<int> >(image.height);
+  for (int r = 0; r < image.height; ++r) {
+    group_of_pixel[r] = std::vector<int>(image.width);
+    for (int c = 0; c < image.width; ++c) {
+      int index = r * image.width + c;
+      int group = vertex_disjoint_set.FindGroup(index);
+      group_of_pixel[r][c] = group;
     }
   }
 }

@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "bmp_reader.h"
-#include "disjoint_set.h"
 #include "image.h"
 #include "polygon_mesh.h"
 #include "segmentation.h"
@@ -25,11 +24,11 @@ typedef Graph2D<int> GraphType;
 
 typedef std::pair<float, float> FloatPair;
 
-char *input_file_name = "input4.bmp";
+char *input_file_name = "input3.bmp";
 const char *window_name = "Mesh Generator (1) : image (2) : quad mesh (3) : triangle mesh (+), (-) : adjust size of mesh (4) : display / hide mesh";
 
 void Initial();
-void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, int target_image_height);
+void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, int target_image_height, double mesh_width, double mesh_height);
 void StartOpenGL();
 void Exit();
 
@@ -44,7 +43,7 @@ void ChangeGLTexture(void *texture_pointer, int width, int height);
 int GetMouseNearestVertexIndex(std::vector<FloatPair> &vertex_list, FloatPair &target, float &nearest_distance);
 
 void BuildQuadMesh();
-void BuildQuadMeshFromGraph(const GraphType &G);
+void BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height);
 void BuildTriangleMesh();
 void ReBuildMesh();
 void DrawPolygonMesh(std::vector<PolygonMesh<float> > &mesh_list, std::vector<FloatPair> &vertex_list);
@@ -67,7 +66,7 @@ const int MESH_SIZE_GAP = 5;
 int current_mesh_size = 70;
 
 bool is_viewing_mesh = true;
-bool is_viewing_mesh_point = true;
+bool is_viewing_mesh_point = false;
 
 std::vector<PolygonMesh<float> > quad_mesh_list;
 std::vector<FloatPair> quad_mesh_vertex_list;
@@ -100,7 +99,7 @@ int main(int argc, char **argv) {
   scanf("%d", &target_image_height);
   printf("Warping image from (%d x %d) to (%d x %d)\n", image.width, image.height, target_image_width, target_image_height);
 
-  PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height);
+  PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, 10, 10);
 
   puts("Start OpenGL");
 
@@ -114,8 +113,8 @@ void BuildQuadMesh() {
   int mesh_column_count = image.width / current_mesh_size;
   int mesh_row_count = image.height / current_mesh_size;
 
-  float real_mesh_width = image.width / (float)(image.width / current_mesh_size);
-  float real_mesh_height = image.height / (float)(image.height / current_mesh_size);
+  float real_mesh_width = image.width / (float)mesh_column_count;
+  float real_mesh_height = image.height / (float)mesh_column_count;
 
   quad_mesh_vertex_list.clear();
 
@@ -148,25 +147,42 @@ void BuildQuadMesh() {
   }
 }
 
-void BuildQuadMeshFromGraph(const GraphType &G) {
+void BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height) {
+  G.V.clear();
+  G.E.clear();
+
+  int mesh_column_count = image.width / mesh_width;
+  int mesh_row_count = image.height / mesh_height;
+
+  float real_mesh_width = image.width / (float)mesh_column_count;
+  float real_mesh_height = image.height / (float)mesh_row_count;
+
   quad_mesh_vertex_list.clear();
 
-  for (int vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
-    quad_mesh_vertex_list.push_back(G.V[vertex_index]);
+  for (int r = 0; r < mesh_row_count; ++r) {
+    for (int c = 0; c < mesh_column_count; ++c) {
+      quad_mesh_vertex_list.push_back(FloatPair(c * real_mesh_width, r * real_mesh_height));
+      G.V.push_back(quad_mesh_vertex_list.back());
+    }
   }
 
   quad_mesh_list.clear();
 
-  for (int r = 0; r < image.height - 1; ++r) {
-    for (int c = 0; c < image.width - 1; ++c) {
+  for (int r = 0; r < mesh_row_count - 1; ++r) {
+    for (int c = 0; c < mesh_column_count - 1; ++c) {
       std::vector<int> vertex_index;
       std::vector<FloatPair> texture_coordinate;
 
-      int base_index = r * image.width + c;
+      int base_index = r * (mesh_column_count) + c;
       vertex_index.push_back(base_index);
-      vertex_index.push_back(base_index + image.width);
-      vertex_index.push_back(base_index + image.width + 1);
+      vertex_index.push_back(base_index + mesh_column_count);
+      vertex_index.push_back(base_index + mesh_column_count + 1);
       vertex_index.push_back(base_index + 1);
+
+      G.E.push_back(Edge(std::pair<int, int>(base_index, base_index + mesh_column_count)));
+      G.E.push_back(Edge(std::pair<int, int>(base_index + mesh_column_count, base_index + mesh_column_count + 1)));
+      G.E.push_back(Edge(std::pair<int, int>(base_index + mesh_column_count + 1, base_index + 1)));
+      G.E.push_back(Edge(std::pair<int, int>(base_index, base_index + 1)));
 
       for (auto it = vertex_index.begin(); it != vertex_index.end(); ++it) {
         FloatPair mesh_vertex = quad_mesh_vertex_list[*it];
@@ -176,6 +192,36 @@ void BuildQuadMeshFromGraph(const GraphType &G) {
       quad_mesh_list.push_back(PolygonMesh<float>(vertex_index, texture_coordinate));
     }
   }
+
+  /*
+  quad_mesh_vertex_list.clear();
+
+  for (int vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
+  quad_mesh_vertex_list.push_back(G.V[vertex_index]);
+  }
+
+  quad_mesh_list.clear();
+
+  for (int r = 0; r < image.height - 1; ++r) {
+  for (int c = 0; c < image.width - 1; ++c) {
+  std::vector<int> vertex_index;
+  std::vector<FloatPair> texture_coordinate;
+
+  int base_index = r * image.width + c;
+  vertex_index.push_back(base_index);
+  vertex_index.push_back(base_index + image.width);
+  vertex_index.push_back(base_index + image.width + 1);
+  vertex_index.push_back(base_index + 1);
+
+  for (auto it = vertex_index.begin(); it != vertex_index.end(); ++it) {
+  FloatPair mesh_vertex = quad_mesh_vertex_list[*it];
+  texture_coordinate.push_back(FloatPair(mesh_vertex.first / image.width, mesh_vertex.second / image.height));
+  }
+
+  quad_mesh_list.push_back(PolygonMesh<float>(vertex_index, texture_coordinate));
+  }
+  }
+  */
 }
 
 void BuildTriangleMesh() {
@@ -573,34 +619,34 @@ void Initial() {
   eye_z_translation = cotanget_of_half_of_fovy * (image.height / 2.0);
 }
 
-void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, int target_image_height) {
+void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, int target_image_height, double mesh_width, double mesh_height) {
 
   GraphType G;
-  DisjointSet vertex_disjoint_set;
+  std::vector<std::vector<int> > group_of_pixel;
 
   puts("Start : Image segmentation");
   const double SEGMENTATION_SIGMA = 0.8;
   const double SEGMENTATION_K = (image.width + image.height) / 1.75;
   const double SEGMENTATION_MIN_PATCH_SIZE = (image.width * image.height) * 0.0001;
   const double SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD = 20;
-  Segmentation(image, G, vertex_disjoint_set, SEGMENTATION_SIGMA, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
+  Segmentation(image, G, group_of_pixel, SEGMENTATION_SIGMA, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
   image.write_BMP_image("segmentation.bmp");
   puts("Done : Image segmentation");
 
   puts("Start : Build mesh from graph");
-  BuildQuadMeshFromGraph(G);
+  BuildQuadMeshWithGraph(G, mesh_width, mesh_height);
   puts("Done : Build mesh from graph");
 
   puts("Start : Image saliency calculation");
   puts("Done : Image saliency calculation");
 
   puts("Start : Image warping");
-  ImageType result_image = Warping(image, G, vertex_disjoint_set, target_image_width, target_image_height/*, Saliency*/);
+  ImageType result_image = Warping(image, G, group_of_pixel, target_image_width, target_image_height, mesh_width, mesh_height/*, Saliency*/);
   result_image.write_BMP_image("warping.bmp");
   puts("Done : Image warping");
 
   for (int vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
-    printf("(%f %f) -> (%d %d)\n", quad_mesh_vertex_list[vertex_index].first, quad_mesh_vertex_list[vertex_index].second, G.V[vertex_index].first, G.V[vertex_index].second);
+    //printf("(%f %f) -> (%d %d)\n", quad_mesh_vertex_list[vertex_index].first, quad_mesh_vertex_list[vertex_index].second, G.V[vertex_index].first, G.V[vertex_index].second);
     quad_mesh_vertex_list[vertex_index].first = G.V[vertex_index].first;
     quad_mesh_vertex_list[vertex_index].second = G.V[vertex_index].second;
   }

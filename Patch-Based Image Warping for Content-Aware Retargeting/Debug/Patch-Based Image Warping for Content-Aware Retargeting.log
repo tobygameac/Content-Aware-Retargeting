@@ -1,27 +1,27 @@
-﻿Build started 8/3/2015 7:41:45 PM.
+﻿Build started 2015/8/4 下午 03:53:32.
      1>Project "D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc110.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp
          main.cpp
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(26): warning C4018: '<' : signed/unsigned mismatch
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(33): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(47): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(51): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(65): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(70): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(95): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(108): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(147): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(89): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(48): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(52): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(62): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(73): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(78): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(104): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(120): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(160): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(88): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
                  c:\program files (x86)\microsoft visual studio 11.0\vc\include\string.h(110) : see declaration of 'strcpy'
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(98): warning C4996: 'scanf': This function or variable may be unsafe. Consider using scanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(97): warning C4996: 'scanf': This function or variable may be unsafe. Consider using scanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
                  c:\program files (x86)\microsoft visual studio 11.0\vc\include\stdio.h(290) : see declaration of 'scanf'
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(100): warning C4996: 'scanf': This function or variable may be unsafe. Consider using scanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(99): warning C4996: 'scanf': This function or variable may be unsafe. Consider using scanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
                  c:\program files (x86)\microsoft visual studio 11.0\vc\include\stdio.h(290) : see declaration of 'scanf'
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(154): warning C4018: '<' : signed/unsigned mismatch
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(255): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(301): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
                  c:\program files (x86)\microsoft visual studio 11.0\vc\include\stdio.h(357) : see declaration of 'sprintf'
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(602): warning C4018: '<' : signed/unsigned mismatch
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\main.cpp(648): warning C4018: '<' : signed/unsigned mismatch
        Link:
          C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Debug\Patch-Based Image Warping for Content-Aware Retargeting.exe" /INCREMENTAL /NOLOGO cplex1260d.lib ilocplexd.lib concertd.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Debug\Patch-Based Image Warping for Content-Aware Retargeting.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Debug\Patch-Based Image Warping for Content-Aware Retargeting.lib" /MACHINE:X86 Debug\bmp_reader.obj
          Debug\segmentation.obj
@@ -32,4 +32,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:03.43
+Time Elapsed 00:00:02.97

@@ -7,14 +7,14 @@
 #include <ilconcert/iloexpression.h>
 
 #include <vector>
+#include <map>
 
-#include "disjoint_set.h"
 #include "image.h"
 
 typedef Image<unsigned char> ImageType;
 typedef Graph2D<int> GraphType;
 
-ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_set, int target_image_width, int target_image_height/*, Saliency*/) {
+ImageType Warping(ImageType &image, GraphType &G, std::vector<std::vector<int> > &group_of_pixel, int target_image_width, int target_image_height, double mesh_width, double mesh_height/*, Saliency*/) {
   if (target_image_width <= 0 || target_image_height <= 0) {
     printf("Wrong target image size (%d x %d)\n", target_image_width, target_image_height);
     exit(-1);
@@ -22,17 +22,17 @@ ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
   ImageType result_image(target_image_width, target_image_height);
 
   // Build the vertex list of each patch
-  std::vector<std::vector<int> > vertex_index_list_of_patch(vertex_disjoint_set.GroupCount());
+  std::map<int, std::vector<int> > vertex_index_list_of_patch;
   for (int vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
-    int group_of_vertex = vertex_disjoint_set.FindGroup(vertex_index);
+    int group_of_vertex = group_of_pixel[G.V[vertex_index].second][G.V[vertex_index].first];
     vertex_index_list_of_patch[group_of_vertex].push_back(vertex_index);
   }
 
   // Build the edge list of each patch
-  std::vector<std::vector<int> > edge_index_list_of_patch(vertex_disjoint_set.GroupCount());
+  std::map<int, std::vector<int> > edge_index_list_of_patch;
   for (int edge_index = 0; edge_index < G.E.size(); ++edge_index) {
-    int group_of_x = vertex_disjoint_set.FindGroup(G.E[edge_index].e.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(G.E[edge_index].e.second);
+    int group_of_x = group_of_pixel[G.V[G.E[edge_index].e.first].second][G.V[G.E[edge_index].e.first].first];
+    int group_of_y = group_of_pixel[G.V[G.E[edge_index].e.second].second][G.V[G.E[edge_index].e.second].first];
     if (group_of_x == group_of_y) {
       edge_index_list_of_patch[group_of_x].push_back(edge_index);
     } else {
@@ -42,8 +42,9 @@ ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
   }
 
   // Calculate the saliency value of each patch
-  std::vector<double> saliency_of_patch(vertex_index_list_of_patch.size());
+  std::map<int, double> saliency_of_patch;
   srand(time(0));
+  double min_saliency = 2e9, max_saliency = -2e9;
   for (int patch_index = 0; patch_index < vertex_index_list_of_patch.size(); ++patch_index) {
     if (edge_index_list_of_patch[patch_index].size()) {
       saliency_of_patch[patch_index] = 1 / (double)edge_index_list_of_patch[patch_index].size();
@@ -53,6 +54,13 @@ ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
       //saliency_of_patch[patch_index] = (rand() % 100 + 1) / 100.0;
       //saliency_of_patch[patch_index] = 1;
     }
+    min_saliency = (min_saliency < saliency_of_patch[patch_index]) ? min_saliency : saliency_of_patch[patch_index];
+    max_saliency = (max_saliency > saliency_of_patch[patch_index]) ? max_saliency : saliency_of_patch[patch_index];
+  }
+
+  // Normalize saliency values
+  for (int patch_index = 0; patch_index < vertex_index_list_of_patch.size(); ++patch_index) {
+    saliency_of_patch[patch_index] = (saliency_of_patch[patch_index] - min_saliency) / (max_saliency - min_saliency);
   }
 
   IloEnv env;
@@ -68,7 +76,8 @@ ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
   }
 
   for (int patch_index = 0; patch_index < edge_index_list_of_patch.size(); ++patch_index) {
-    std::vector<int> edge_index_list = edge_index_list_of_patch[patch_index];
+    std::vector<int> &edge_index_list = edge_index_list_of_patch[patch_index];
+
     if (!edge_index_list.size()) {
       continue;
     }
@@ -81,16 +90,16 @@ ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
     double original_matrix_b = c_y;
     double original_matrix_c = c_y;
     double original_matrix_d = -c_x;
-    double rank = original_matrix_a * original_matrix_d - original_matrix_b * original_matrix_c;
+    double matrix_rank = original_matrix_a * original_matrix_d - original_matrix_b * original_matrix_c;
 
-    if (rank == 0) {
-      continue;
+    if (fabs(matrix_rank) <= 1e-9) {
+      matrix_rank = 1e-9;
     }
 
-    double matrix_a = original_matrix_d / rank;
-    double matrix_b = -original_matrix_b / rank;
-    double matrix_c = -original_matrix_c / rank;
-    double matrix_d = original_matrix_a / rank;
+    double matrix_a = original_matrix_d / matrix_rank;
+    double matrix_b = -original_matrix_b / matrix_rank;
+    double matrix_c = -original_matrix_c / matrix_rank;
+    double matrix_d = original_matrix_a / matrix_rank;
 
     for (int edge_index = 0; edge_index < edge_index_list.size(); ++edge_index) {
       Edge edge = G.E[edge_index_list[edge_index]];
@@ -100,18 +109,22 @@ ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
       double transformation_s = matrix_a * e_x + matrix_b * e_y;
       double transformation_r = matrix_c * e_x + matrix_d * e_y;
 
-      expr += IloPower(saliency_of_patch[patch_index] * ((x[edge.e.first * 2] - x[edge.e.second * 2]) - (transformation_s * (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + transformation_r * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1]))), 2);
-      expr += IloPower(saliency_of_patch[patch_index] * ((x[edge.e.first * 2 + 1] - x[edge.e.second * 2 + 1]) - (-transformation_r * (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + transformation_s * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1]))), 2);
+      expr += saliency_of_patch[patch_index] * IloPower((x[edge.e.first * 2] - x[edge.e.second * 2]) - (transformation_s * (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + transformation_r * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1])), 2);
+      expr += saliency_of_patch[patch_index] * IloPower((x[edge.e.first * 2 + 1] - x[edge.e.second * 2 + 1]) - (-transformation_r * (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + transformation_s * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1])), 2);
     }
   }
 
+  int mesh_column_count = image.width / mesh_width;
+  int mesh_row_count = image.height / mesh_height;
+
   for (int vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
     int left_neighbor_index = vertex_index - 1;
-    int up_neighbor_index = vertex_index - image.width;
+    int up_neighbor_index = vertex_index - mesh_column_count;
 
-    if ((vertex_index % image.width) != 0) {
+    if ((vertex_index % mesh_column_count) != 0) {
       expr += IloPower(x[vertex_index * 2 + 1] - x[left_neighbor_index * 2 + 1], 2);
     }
+
     if (up_neighbor_index >= 0) {
       expr += IloPower(x[vertex_index * 2] - x[up_neighbor_index * 2], 2);
     }
@@ -119,16 +132,16 @@ ImageType Warping(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_s
 
   model.add(IloMinimize(env, expr));
 
-  for (int row = 0; row < image.height; ++row) {
-    int vertex_index = row * image.width;
+  for (int row = 0; row < mesh_row_count; ++row) {
+    int vertex_index = row * mesh_column_count;
     c.add(x[vertex_index * 2] == G.V[0].first);
-    vertex_index = row * image.width + image.width - 1;
+    vertex_index = row * mesh_column_count + mesh_column_count - 1;
     c.add(x[vertex_index * 2] == target_image_width);
   }
-  for (int column = 0; column < image.width; ++column) {
+  for (int column = 0; column < mesh_column_count; ++column) {
     int vertex_index = column;
     c.add(x[vertex_index * 2 + 1] == G.V[0].second);
-    vertex_index = (image.height - 1) * image.width + column;
+    vertex_index = (mesh_row_count - 1) * mesh_column_count + column;
     c.add(x[vertex_index * 2 + 1] == target_image_height);
   }
 

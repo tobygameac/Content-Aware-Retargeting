@@ -12,7 +12,7 @@ typedef Image<unsigned char> ImageType;
 typedef Graph2D<int> GraphType;
 
 void GaussianSmoothing(ImageType &image, double sigma);
-GraphType BuildGraphFromImage(ImageType &image);
-void Segmentation(ImageType &image, GraphType &G, DisjointSet &vertex_disjoint_set, double sigma, double k, int min_patch_size, double similar_color_patch_merge_threshold);
+void BuildGraphFromImage(ImageType &image, GraphType &G);
+void Segmentation(ImageType &image, GraphType &G, std::vector<std::vector<int> > &group_of_pixel, double sigma, double k, int min_patch_size, double similar_color_patch_merge_threshold);
 
 #endif
