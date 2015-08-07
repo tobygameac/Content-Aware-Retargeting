@@ -151,6 +151,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="bmp_reader.h" />
+    <ClInclude Include="saliency.h" />
     <ClInclude Include="disjoint_set.h" />
     <ClInclude Include="graph.h" />
     <ClInclude Include="image.h" />

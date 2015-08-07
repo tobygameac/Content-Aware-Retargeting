@@ -15,6 +15,7 @@
 #include "bmp_reader.h"
 #include "image.h"
 #include "polygon_mesh.h"
+#include "saliency.h"
 #include "segmentation.h"
 #include "triangle.h"
 #include "warping.h"
@@ -100,8 +101,6 @@ int main(int argc, char **argv) {
   printf("Warping image from (%d x %d) to (%d x %d)\n", image.width, image.height, target_image_width, target_image_height);
 
   PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, 10, 10);
-
-  puts("Start OpenGL");
 
   StartOpenGL();
   Exit();
@@ -192,36 +191,6 @@ void BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height)
       quad_mesh_list.push_back(PolygonMesh<float>(vertex_index, texture_coordinate));
     }
   }
-
-  /*
-  quad_mesh_vertex_list.clear();
-
-  for (int vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
-  quad_mesh_vertex_list.push_back(G.V[vertex_index]);
-  }
-
-  quad_mesh_list.clear();
-
-  for (int r = 0; r < image.height - 1; ++r) {
-  for (int c = 0; c < image.width - 1; ++c) {
-  std::vector<int> vertex_index;
-  std::vector<FloatPair> texture_coordinate;
-
-  int base_index = r * image.width + c;
-  vertex_index.push_back(base_index);
-  vertex_index.push_back(base_index + image.width);
-  vertex_index.push_back(base_index + image.width + 1);
-  vertex_index.push_back(base_index + 1);
-
-  for (auto it = vertex_index.begin(); it != vertex_index.end(); ++it) {
-  FloatPair mesh_vertex = quad_mesh_vertex_list[*it];
-  texture_coordinate.push_back(FloatPair(mesh_vertex.first / image.width, mesh_vertex.second / image.height));
-  }
-
-  quad_mesh_list.push_back(PolygonMesh<float>(vertex_index, texture_coordinate));
-  }
-  }
-  */
 }
 
 void BuildTriangleMesh() {
@@ -633,15 +602,19 @@ void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, in
   image.write_BMP_image("segmentation.bmp");
   puts("Done : Image segmentation");
 
-  puts("Start : Build mesh from graph");
+  puts("Start : Build mesh and graph");
   BuildQuadMeshWithGraph(G, mesh_width, mesh_height);
-  puts("Done : Build mesh from graph");
+  puts("Done : Build mesh and graph");
 
   puts("Start : Image saliency calculation");
+  const double SALIENCY_C = 3;
+  const double SALIENCY_K = 64;
+  std::vector<std::vector<double> > saliency_map;
+  CalculateContextAwareSaliencyMap(image, saliency_map, SALIENCY_C, SALIENCY_K);
   puts("Done : Image saliency calculation");
 
   puts("Start : Image warping");
-  ImageType result_image = Warping(image, G, group_of_pixel, target_image_width, target_image_height, mesh_width, mesh_height/*, Saliency*/);
+  ImageType result_image = Warping(image, G, group_of_pixel, saliency_map, target_image_width, target_image_height, mesh_width, mesh_height/*, Saliency*/);
   result_image.write_BMP_image("warping.bmp");
   puts("Done : Image warping");
 
