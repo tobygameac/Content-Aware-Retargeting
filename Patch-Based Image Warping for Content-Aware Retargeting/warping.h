@@ -15,7 +15,7 @@
 typedef Image<unsigned char> ImageType;
 typedef Graph2D<int> GraphType;
 
-ImageType Warping(const ImageType &image, GraphType &G, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<std::vector<double> > &saliency_map, int target_image_width, int target_image_height, double mesh_width, double mesh_height) {
+ImageType Warping(const ImageType &image, GraphType &G, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<std::vector<double> > &saliency_map, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
   if (target_image_width <= 0 || target_image_height <= 0) {
     printf("Wrong target image size (%d x %d)\n", target_image_width, target_image_height);
     exit(-1);

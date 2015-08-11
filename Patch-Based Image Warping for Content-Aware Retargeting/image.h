@@ -50,7 +50,25 @@ public:
     }
   }
 
-  bool write_BMP_image(const char *file_name) {
+  void Resize(const double resized_scale) {
+    Resize(width * resized_scale, height * resized_scale);
+  }
+
+  void Resize(const int target_width, const int target_height) {
+    Image<T> resized_image(target_width, target_height);
+    if (width > 0 && height > 0 && target_height > 0 && target_width > 0) {
+      for (int r = 0; r < target_height; ++r) {
+        for (int c = 0; c < target_width; ++c) {
+          int original_r = (r / (double)target_height) * height;
+          int original_c = (c / (double)target_width) * width;
+          resized_image.pixel[r][c] = pixel[original_r][original_c];
+        }
+      }
+    }
+    *this = resized_image;
+  }
+
+  bool WirteBMPImage(const char *file_name) {
     const int HEADER_SIZE = 54;
 
     char header[HEADER_SIZE] = {

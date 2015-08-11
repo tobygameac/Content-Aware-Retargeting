@@ -17,6 +17,7 @@
 #include "polygon_mesh.h"
 #include "saliency.h"
 #include "segmentation.h"
+#include "smooth.h"
 #include "triangle.h"
 #include "warping.h"
 
@@ -28,8 +29,10 @@ typedef std::pair<float, float> FloatPair;
 char *input_file_name = "input3.bmp";
 const char *window_name = "Mesh Generator (1) : image (2) : quad mesh (3) : triangle mesh (+), (-) : adjust size of mesh (4) : display / hide mesh";
 
+int target_image_width, target_image_height;
+
 void Initial();
-void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, int target_image_height, double mesh_width, double mesh_height);
+void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height);
 void StartOpenGL();
 void Exit();
 
@@ -90,8 +93,6 @@ int main(int argc, char **argv) {
   }
 
   Initial();
-
-  int target_image_width, target_image_height;
 
   printf("Input image(%s) size : (%d x %d)\n", input_file_name, image.width, image.height);
   printf("Please input target image width : ");
@@ -492,6 +493,11 @@ void Keyboard(unsigned char key, int x, int y) {
     Exit();
     break;
   }
+  if (program_mode == VIEWING_QUAD_MESH) {
+    Reshape(target_image_width, target_image_height);
+  } else {
+    Reshape(image.width, image.height);
+  }
   glutPostRedisplay();
 }
 
@@ -510,7 +516,11 @@ void Reshape(int w, int h) {
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
-  glutReshapeWindow(image.width, image.height);
+  if (program_mode == VIEWING_QUAD_MESH) {
+    glutReshapeWindow(target_image_width, target_image_height);
+  } else {
+    glutReshapeWindow(image.width, image.height);
+  }
 }
 
 void Mouse(int button, int state, int x, int y) {
@@ -588,18 +598,23 @@ void Initial() {
   eye_z_translation = cotanget_of_half_of_fovy * (image.height / 2.0);
 }
 
-void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, int target_image_height, double mesh_width, double mesh_height) {
+void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
 
   GraphType G;
   std::vector<std::vector<int> > group_of_pixel;
 
+  puts("Start : Gaussian smoothing");
+  const double SMOOTH_SIGMA = 0.8;
+  ImageType image_after_smoothing = GaussianSmoothing(image, SMOOTH_SIGMA);
+  image_after_smoothing.WirteBMPImage("smooth.bmp");
+  puts("Done : Gaussian smoothing");
+
   puts("Start : Image segmentation");
-  const double SEGMENTATION_SIGMA = 0.8;
   const double SEGMENTATION_K = (image.width + image.height) / 1.75;
   const double SEGMENTATION_MIN_PATCH_SIZE = (image.width * image.height) * 0.0001;
   const double SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD = 20;
-  Segmentation(image, G, group_of_pixel, SEGMENTATION_SIGMA, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
-  image.write_BMP_image("segmentation.bmp");
+  ImageType image_after_segmentation = Segmentation(image_after_smoothing, G, group_of_pixel, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
+  image_after_segmentation.WirteBMPImage("segmentation.bmp");
   puts("Done : Image segmentation");
 
   puts("Start : Build mesh and graph");
@@ -610,12 +625,13 @@ void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, in
   const double SALIENCY_C = 3;
   const double SALIENCY_K = 64;
   std::vector<std::vector<double> > saliency_map;
-  CalculateContextAwareSaliencyMap(image, saliency_map, SALIENCY_C, SALIENCY_K);
+  ImageType saliency_image = CalculateContextAwareSaliencyMap(image, saliency_map, SALIENCY_C, SALIENCY_K);
+  saliency_image.WirteBMPImage("saliency.bmp");
   puts("Done : Image saliency calculation");
 
   puts("Start : Image warping");
-  ImageType result_image = Warping(image, G, group_of_pixel, saliency_map, target_image_width, target_image_height, mesh_width, mesh_height/*, Saliency*/);
-  result_image.write_BMP_image("warping.bmp");
+  ImageType image_after_warping = Warping(image, G, group_of_pixel, saliency_map, target_image_width, target_image_height, mesh_width, mesh_height/*, Saliency*/);
+  image_after_warping.WirteBMPImage("warping.bmp");
   puts("Done : Image warping");
 
   for (int vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
@@ -623,8 +639,6 @@ void PatchBasedImageWarpingForContentAwareRetargeting(int target_image_width, in
     quad_mesh_vertex_list[vertex_index].first = G.V[vertex_index].first;
     quad_mesh_vertex_list[vertex_index].second = G.V[vertex_index].second;
   }
-
-  image = result_image;
 }
 
 void StartOpenGL() {

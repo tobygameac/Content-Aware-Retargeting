@@ -157,6 +157,7 @@
     <ClInclude Include="image.h" />
     <ClInclude Include="polygon_mesh.h" />
     <ClInclude Include="segmentation.h" />
+    <ClInclude Include="smooth.h" />
     <ClInclude Include="triangle.h" />
     <ClInclude Include="warping.h" />
   </ItemGroup>
