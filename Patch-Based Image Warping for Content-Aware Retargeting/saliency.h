@@ -25,15 +25,18 @@ cv::Mat CalculateContextAwareSaliencyMapWithMatlabProgram(const cv::Mat &image, 
   }
 
   cv::Mat saliency_image = cv::imread(output_image_name);
+  cv::resize(saliency_image, saliency_image, image.size());
 
   saliency_map.clear();
   saliency_map = std::vector<std::vector<double> >(image.size().height, std::vector<double>(image.size().width));
 
   for (int r = 0; r < image.size().height; ++r) {
     for (int c = 0; c < image.size().width; ++c) {
-      unsigned saliency_image_r = saliency_image.size().height * (r / (double)image.size().height);
-      unsigned saliency_image_c = saliency_image.size().width * (c / (double)image.size().width);
-      saliency_map[r][c] += saliency_image.at<unsigned char>(saliency_image_r, saliency_image_c);
+      for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
+        saliency_map[r][c] += saliency_image.at<cv::Vec3b>(r, c).val[pixel_index];
+      }
+      saliency_map[r][c] /= 3;
+      saliency_map[r][c] /= 255.0;
     }
   }
 

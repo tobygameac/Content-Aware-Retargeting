@@ -1,4 +1,4 @@
-﻿Build started 9/16/2015 7:25:54 PM.
+﻿Build started 9/17/2015 9:02:16 PM.
      1>Project "D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\CL.exe /c /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc110.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp
@@ -50,4 +50,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:04.90
+Time Elapsed 00:00:05.04

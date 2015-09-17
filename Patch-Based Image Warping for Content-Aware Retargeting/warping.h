@@ -13,50 +13,25 @@
 
 typedef Graph2D<int> GraphType;
 
-void Warping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<std::vector<double> > &saliency_map, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
+void Warping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<double> &saliency_of_patch, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
   if (target_image_width <= 0 || target_image_height <= 0) {
     printf("Wrong target image size (%d x %d)\n", target_image_width, target_image_height);
     exit(-1);
   }
 
-  cv::Mat result_image(target_image_height, target_image_width, image.type());
-
-  // Build the vertex list of each patch
-  std::vector<std::vector<int> > vertex_index_list_of_patch(image.size().width * image.size().height);
-  for (size_t vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
-    int group_of_vertex = group_of_pixel[G.V[vertex_index].second][G.V[vertex_index].first];
-    vertex_index_list_of_patch[group_of_vertex].push_back(vertex_index);
-  }
-
   // Build the edge list of each patch
   std::vector<std::vector<int> > edge_index_list_of_patch(image.size().width * image.size().height);
   for (size_t edge_index = 0; edge_index < G.E.size(); ++edge_index) {
-    int group_of_x = group_of_pixel[G.V[G.E[edge_index].e.first].second][G.V[G.E[edge_index].e.first].first];
-    int group_of_y = group_of_pixel[G.V[G.E[edge_index].e.second].second][G.V[G.E[edge_index].e.second].first];
+    int x_vertex_index = G.E[edge_index].e.first;
+    int y_vertex_index = G.E[edge_index].e.second;
+    int group_of_x = group_of_pixel[G.V[x_vertex_index].second][G.V[x_vertex_index].first];
+    int group_of_y = group_of_pixel[G.V[y_vertex_index].second][G.V[y_vertex_index].first];
     if (group_of_x == group_of_y) {
       edge_index_list_of_patch[group_of_x].push_back(edge_index);
     } else {
       edge_index_list_of_patch[group_of_x].push_back(edge_index);
       edge_index_list_of_patch[group_of_y].push_back(edge_index);
     }
-  }
-
-  // Calculate the saliency value of each patch
-  std::vector<double> saliency_of_patch(image.size().width * image.size().height);
-  double min_saliency = 2e9, max_saliency = -2e9;
-  for (size_t patch_index = 0; patch_index < vertex_index_list_of_patch.size(); ++patch_index) {
-    for (size_t vertex_index = 0; vertex_index < vertex_index_list_of_patch[patch_index].size(); ++vertex_index) {
-      int vertex_r = G.V[vertex_index_list_of_patch[patch_index][vertex_index]].second;
-      int vertex_c = G.V[vertex_index_list_of_patch[patch_index][vertex_index]].first;
-      saliency_of_patch[patch_index] += saliency_map[vertex_r][vertex_c] / (double)vertex_index_list_of_patch[patch_index].size();
-    }
-    min_saliency = std::min(min_saliency, saliency_of_patch[patch_index]);
-    max_saliency = std::max(max_saliency, saliency_of_patch[patch_index]);
-  }
-
-  // Normalize saliency values
-  for (size_t patch_index = 0; patch_index < vertex_index_list_of_patch.size(); ++patch_index) {
-    saliency_of_patch[patch_index] = (saliency_of_patch[patch_index] - min_saliency) / (max_saliency - min_saliency);
   }
 
   IloEnv env;
@@ -111,22 +86,24 @@ void Warping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<i
       double t_s = matrix_a * e_x + matrix_b * e_y;
       double t_r = matrix_c * e_x + matrix_d * e_y;
 
+      const double DST_WEIGHT = 5.0;
+      const double DLT_WEIGHT = 1.0;
       // DST
-      expr += alpha * saliency_of_patch[patch_index] *
+      expr += DST_WEIGHT * saliency_of_patch[patch_index] *
         IloPower((x[edge.e.first * 2] - x[edge.e.second * 2]) -
         (t_s * (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + t_r * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1])),
         2);
-      expr += alpha * saliency_of_patch[patch_index] * 
+      expr += DST_WEIGHT * saliency_of_patch[patch_index] * 
         IloPower((x[edge.e.first * 2 + 1] - x[edge.e.second * 2 + 1]) -
         (-t_r * (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + t_s * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1])),
         2);
 
       // DLT
-      expr += (1 - alpha) * (1 - saliency_of_patch[patch_index]) *
+      expr += DLT_WEIGHT * (1 - saliency_of_patch[patch_index]) *
         IloPower((x[edge.e.first * 2] - x[edge.e.second * 2]) -
         width_ratio * (t_s * (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + t_r * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1])),
         2);
-      expr += (1 - alpha) * (1 - saliency_of_patch[patch_index]) * 
+      expr += DLT_WEIGHT * (1 - saliency_of_patch[patch_index]) * 
         IloPower((x[edge.e.first * 2 + 1] - x[edge.e.second * 2 + 1]) -
         height_ratio * (-t_r *  (x[representive_edge.e.first * 2] - x[representive_edge.e.second * 2]) + t_s * (x[representive_edge.e.first * 2 + 1] - x[representive_edge.e.second * 2 + 1])),
         2);
@@ -136,6 +113,8 @@ void Warping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<i
   int mesh_column_count = image.size().width / mesh_width;
   int mesh_row_count = image.size().height / mesh_height;
 
+  const double ORIENTATION_WEIGHT = 10.0;
+
   // Grid orientation constraint
   for (size_t edge_index = 0; edge_index < G.E.size(); ++edge_index) {
     int vertex_index_1 = G.E[edge_index].e.first;
@@ -143,9 +122,9 @@ void Warping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<i
     int delta_x = abs(G.V[vertex_index_1].first - G.V[vertex_index_2].first);
     int delta_y = abs(G.V[vertex_index_1].second - G.V[vertex_index_2].second);
     if (delta_x > delta_y) { // Horizontal
-      expr += 2 * IloPower(x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1], 2);
+      expr += ORIENTATION_WEIGHT * 2 * IloPower(x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1], 2);
     } else {
-      expr += 2 * IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2);
+      expr += ORIENTATION_WEIGHT * 2 * IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2);
     }
   }
 
@@ -166,6 +145,22 @@ void Warping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<i
     c.add(x[vertex_index * 2 + 1] == target_image_height);
   }
 
+  for (int row = 0; row < mesh_row_count; ++row) {
+    for (int column = 1; column < mesh_column_count; ++column) {
+      int vertex_index_right = row * mesh_column_count + column;
+      int vertex_index_left = row * mesh_column_count + column - 1;
+      c.add((x[vertex_index_right * 2] - x[vertex_index_left * 2]) >= 1e-4);
+    }
+  }
+
+  for (int row = 1; row < mesh_row_count; ++row) {
+    for (int column = 0; column < mesh_column_count; ++column) {
+      int vertex_index_down = row * mesh_column_count + column;
+      int vertex_index_up = (row - 1) * mesh_column_count + column;
+      c.add((x[vertex_index_down * 2 + 1] - x[vertex_index_up * 2 + 1]) >= 1e-4);
+    }
+  }
+
   model.add(c);
 
   IloCplex cplex(model);
@@ -177,7 +172,7 @@ void Warping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<i
   IloNumArray result(env);
 
   cplex.getValues(result, x);
- 
+
   for (size_t vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
     G.V[vertex_index].first = result[vertex_index * 2];
     G.V[vertex_index].second = result[vertex_index * 2 + 1];

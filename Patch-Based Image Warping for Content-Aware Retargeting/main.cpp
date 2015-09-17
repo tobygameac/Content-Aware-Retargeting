@@ -46,7 +46,7 @@ int GetMouseNearestVertexIndex(std::vector<FloatPair> &vertex_list, FloatPair &t
 void BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height);
 void BuildTriangleMesh();
 void ReBuildMesh();
-void DrawPolygonMesh(std::vector<PolygonMesh<float> > &mesh_list, std::vector<FloatPair> &vertex_list);
+void DrawPolygonMesh(const std::vector<PolygonMesh<float> > &mesh_list, const std::vector<FloatPair> &vertex_list);
 void DrawImage();
 
 enum ProgramMode {
@@ -57,15 +57,15 @@ enum ProgramMode {
 
 ProgramMode program_mode;
 
-const float MESH_LINE_WIDTH = 1.5;
+const float MESH_LINE_WIDTH = 3.0;
 const float MESH_POINT_SIZE = 7.5;
 
 const int MIN_MESH_SIZE = 10;
 const int MAX_MESH_SIZE = 120;
 const int MESH_SIZE_GAP = 10;
-int current_mesh_size = 10;
+int current_mesh_size = 20;
 
-bool is_viewing_mesh = false;
+bool is_viewing_mesh = true;
 bool is_viewing_mesh_point = false;
 
 std::vector<PolygonMesh<float> > quad_mesh_list;
@@ -77,9 +77,18 @@ std::vector<FloatPair> triangle_mesh_vertex_list;
 int selected_triangle_mesh_vertex_index;
 
 cv::Mat image;
+cv::Mat image_after_smoothing;
+cv::Mat image_after_segmentation;
+cv::Mat saliency_image;
+cv::Mat significance_image;
+
+cv::Mat image_for_gl_texture;
+
 GraphType image_graph;
 std::vector<std::vector<int> > group_of_pixel;
 std::vector<std::vector<double> > saliency_map;
+std::vector<double> saliency_of_patch;
+std::vector<double> saliency_of_mesh_vertex;
 
 bool data_for_warping_were_generated = false;
 
@@ -96,12 +105,15 @@ int main(int argc, char **argv) {
   Initial();
 
   printf("Input image(%s) size : (%d x %d)\n", input_file_name.c_str(), image.size().width, image.size().height);
-  printf("Please input target image width : ");
-  scanf("%d", &target_image_width);
-  printf("Please input target image height : ");
-  scanf("%d", &target_image_height);
-  printf("Warping image from (%d x %d) to (%d x %d)\n", image.size().width, image.size().height, target_image_width, target_image_height);
 
+  //printf("Please input target image width : ");
+  //scanf("%d", &target_image_width);
+  //printf("Please input target image height : ");
+  //scanf("%d", &target_image_height);
+  //printf("Warping image from (%d x %d) to (%d x %d)\n", image.size().width, image.size().height, target_image_width, target_image_height);
+
+  target_image_width = image.size().width;
+  target_image_height = image.size().height;
   PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
 
   StartOpenGL();
@@ -292,20 +304,27 @@ void ReBuildMesh() {
   PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
 }
 
-void DrawPolygonMesh(std::vector<PolygonMesh<float> > &mesh_list, std::vector<FloatPair> &vertex_list) {
+void DrawPolygonMesh(const std::vector<PolygonMesh<float> > &mesh_list, const std::vector<FloatPair> &vertex_list) {
   for (auto it = mesh_list.begin(); it != mesh_list.end(); ++it) {
 
     int vertex_count = it->vertex_index.size();
 
     if (is_viewing_mesh) {
       // line
-      glColor4f(1.0, 0.0, 0.0, 1.0);
 
       glLineWidth(MESH_LINE_WIDTH);
       glBegin(GL_LINE_STRIP);
 
       for (int j = 0; j < vertex_count + 1; ++j) {
         int vertex_index = it->vertex_index[j % vertex_count];
+        double vertex_saliency = saliency_of_mesh_vertex[vertex_index];
+        if (vertex_saliency < (1 / 3.0)) {
+          glColor3f(0, vertex_saliency * 3.0, 1 - vertex_saliency * 3.0);
+        } else if (vertex_saliency < (2 / 3.0)) {
+          glColor3f((vertex_saliency - (1 / 3.0)) * 3.0, 1.0, 0);
+        } else {
+          glColor3f(1.0, 1.0 - (vertex_saliency - (2 / 3.0)) * 3.0, 0);
+        }
         glVertex3f(vertex_list[vertex_index].first, vertex_list[vertex_index].second, 0);
       }
 
@@ -424,6 +443,11 @@ void Display() {
 }
 
 void Keyboard(unsigned char key, int x, int y) {
+  if (key == '1' || key == '2') {
+    cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
+    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+  }
   switch (key) {
   case '1': 
     program_mode = VIEWING_IMAGE;
@@ -433,13 +457,31 @@ void Keyboard(unsigned char key, int x, int y) {
     selected_quad_mesh_vertex_index = -1;
     break;
   case '3': 
+    is_viewing_mesh = !is_viewing_mesh;
+    break;
+  case '4':
+    program_mode = VIEWING_IMAGE;
+    cv::cvtColor(image_after_segmentation, image_for_gl_texture, CV_BGR2RGB);
+    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+    break;
+  case '5':
+    program_mode = VIEWING_IMAGE;
+    cv::cvtColor(saliency_image, image_for_gl_texture, CV_BGR2RGB);
+    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+    break;
+  case '6':
+    program_mode = VIEWING_IMAGE;
+    cv::cvtColor(significance_image, image_for_gl_texture, CV_BGR2RGB);
+    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+    break;
+  case '7': 
     program_mode = VIEWING_TRIANGLE_MESH;
     selected_triangle_mesh_vertex_index = -1;
     break;
-  case '4': 
-    is_viewing_mesh = !is_viewing_mesh;
-    break;
-  case '5': 
+  case '0': 
     is_viewing_mesh_point = !is_viewing_mesh_point;
     break;
   case '`':
@@ -517,6 +559,7 @@ void Mouse(int button, int state, int x, int y) {
 }
 
 void Motion(int x, int y) {
+  return;
   float world_x = x;
   float world_y = image.size().height - y;
 
@@ -531,6 +574,7 @@ void Motion(int x, int y) {
       triangle_mesh_vertex_list[selected_triangle_mesh_vertex_index].second = world_y;
     }
   }
+
   glutPostRedisplay();
 }
 
@@ -552,7 +596,6 @@ void Initial() {
   glutInitWindowSize(image.size().width, image.size().height);
   window_number = glutCreateWindow(window_name);
 
-  cv::Mat image_for_gl_texture;
   cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
   cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
   ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
@@ -574,7 +617,6 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
     puts("Start : Gaussian smoothing");
     const double SMOOTH_SIGMA = 0.8;
     const cv::Size K_SIZE(3, 3);
-    cv::Mat image_after_smoothing;
     cv::GaussianBlur(image, image_after_smoothing, K_SIZE, SMOOTH_SIGMA);
     cv::imwrite("smooth_" + input_file_name, image_after_smoothing);
     puts("Done : Gaussian smoothing");
@@ -583,15 +625,60 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
     const double SEGMENTATION_K = (image.size().width + image.size().height) / 1.75;
     const double SEGMENTATION_MIN_PATCH_SIZE = (image.size().width * image.size().height) * 0.0001;
     const double SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD = 20;
-    cv::Mat image_after_segmentation = Segmentation(image_after_smoothing, image_graph, group_of_pixel, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
+
+    image_after_segmentation = Segmentation(image_after_smoothing, image_graph, group_of_pixel, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
     cv::imwrite("segmentation_" + input_file_name, image_after_segmentation);
     puts("Done : Image segmentation");
 
     puts("Start : Image saliency calculation");
     const double SALIENCY_C = 3;
     const double SALIENCY_K = 64;
-    cv::Mat saliency_image = CalculateContextAwareSaliencyMapWithMatlabProgram(image, saliency_map, "run_saliency.exe", input_file_name, "saliency_" + input_file_name);
+    saliency_image = CalculateContextAwareSaliencyMapWithMatlabProgram(image, saliency_map, "run_saliency.exe", input_file_name, "saliency_" + input_file_name);
     cv::imwrite("saliency_" + input_file_name, saliency_image);
+
+    // Calculate the saliency value of each patch
+    saliency_of_patch.clear();
+    saliency_of_patch = std::vector<double>(image.size().width * image.size().height);
+    std::vector<int> group_count(image.size().width * image.size().height);
+    for (int r = 0; r < image.size().height; ++r) {
+      for (int c = 0; c < image.size().width; ++c) {
+        ++group_count[group_of_pixel[r][c]];
+        saliency_of_patch[group_of_pixel[r][c]] += saliency_map[r][c];
+      }
+    }
+
+    double min_saliency = 2e9, max_saliency = -2e9;
+    for (size_t patch_index = 0; patch_index < saliency_of_patch.size(); ++patch_index) {
+      if (group_count[patch_index]) {
+        saliency_of_patch[patch_index] /= (double)group_count[patch_index];
+      }
+      min_saliency = std::min(min_saliency, saliency_of_patch[patch_index]);
+      max_saliency = std::max(max_saliency, saliency_of_patch[patch_index]);
+    }
+
+    // Normalize saliency values
+    for (size_t patch_index = 0; patch_index < saliency_of_patch.size(); ++patch_index) {
+      saliency_of_patch[patch_index] = (saliency_of_patch[patch_index] - min_saliency) / (max_saliency - min_saliency);
+    }
+
+    significance_image = cv::Mat(image.size(), image.type());
+    for (int r = 0; r < image.size().height; ++r) {
+      for (int c = 0; c < image.size().width; ++c) {
+        double vertex_saliency = saliency_of_patch[group_of_pixel[r][c]];
+        if (vertex_saliency < (1 / 3.0)) {
+          significance_image.at<cv::Vec3b>(r, c).val[1] = (vertex_saliency * 3.0) * 255;
+          significance_image.at<cv::Vec3b>(r, c).val[0] = (1 - vertex_saliency * 3.0) * 255;
+        } else if (vertex_saliency < (2 / 3.0)) {
+          significance_image.at<cv::Vec3b>(r, c).val[2] = ((vertex_saliency - (1 / 3.0)) * 3.0) * 255;
+          significance_image.at<cv::Vec3b>(r, c).val[1] = 1.0 * 255;
+        } else {
+          significance_image.at<cv::Vec3b>(r, c).val[2] = 1.0 * 255;
+          significance_image.at<cv::Vec3b>(r, c).val[1] = (1.0 - (vertex_saliency - (2 / 3.0)) * 3.0) * 255;
+        }
+      }
+    }
+    cv::imwrite("significance_" + input_file_name, significance_image);
+
     puts("Done : Image saliency calculation");
 
     data_for_warping_were_generated = true;
@@ -602,12 +689,15 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
   puts("Done : Build mesh and graph");
 
   puts("Start : Image warping");
-  Warping(image, image_graph, group_of_pixel, saliency_map, target_image_width, target_image_height, mesh_width, mesh_height);
+  Warping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height);
   puts("Done : Image warping");
   printf("New image size : %d %d\n", target_image_width, target_image_height);
 
+  saliency_of_mesh_vertex.clear();
+  saliency_of_mesh_vertex = std::vector<double>(image_graph.V.size());
+
   for (size_t vertex_index = 0; vertex_index < image_graph.V.size(); ++vertex_index) {
-    //printf("(%f %f) -> (%d %d)\n", quad_mesh_vertex_list[vertex_index].first, quad_mesh_vertex_list[vertex_index].second, G.V[vertex_index].first, G.V[vertex_index].second);
+    saliency_of_mesh_vertex[vertex_index] = saliency_of_patch[group_of_pixel[quad_mesh_vertex_list[vertex_index].second][quad_mesh_vertex_list[vertex_index].first]];
     quad_mesh_vertex_list[vertex_index].first = image_graph.V[vertex_index].first;
     quad_mesh_vertex_list[vertex_index].second = image_graph.V[vertex_index].second;
   }

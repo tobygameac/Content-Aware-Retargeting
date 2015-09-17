@@ -142,24 +142,16 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
   cv::Mat image_after_segmentation = image;
 
   // Write the pixel value
-  for (int r = 0; r < image.size().height; ++r) {
-    for (int c = 0; c < image.size().width; ++c) {
-      int index = r * image.size().width + c;
-      int group = vertex_disjoint_set.FindGroup(index);
-      for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
-        image_after_segmentation.at<cv::Vec3b>(r, c).val[pixel_index] = group_color[group].val[pixel_index];
-      }
-    }
-  }
-
   group_of_pixel.clear();
-  group_of_pixel = std::vector<std::vector<int> >(image.size().height);
+  group_of_pixel = std::vector<std::vector<int> >(image.size().height, std::vector<int>(image.size().width));
   for (int r = 0; r < image.size().height; ++r) {
-    group_of_pixel[r] = std::vector<int>(image.size().width);
     for (int c = 0; c < image.size().width; ++c) {
       int index = r * image.size().width + c;
       int group = vertex_disjoint_set.FindGroup(index);
       group_of_pixel[r][c] = group;
+      for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
+        image_after_segmentation.at<cv::Vec3b>(r, c).val[pixel_index] = group_color[group].val[pixel_index];
+      }
     }
   }
 
