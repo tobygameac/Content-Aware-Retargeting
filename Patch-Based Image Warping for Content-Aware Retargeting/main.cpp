@@ -1,7 +1,8 @@
 #include <windows.h>
 #include <wingdi.h>
 
-#include <GL/glut.h>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
@@ -23,21 +24,21 @@ typedef Graph2D<int> GraphType;
 typedef std::pair<float, float> FloatPair;
 
 std::string input_file_name = "butterfly.jpg";
-const char *window_name = "Mesh Generator (1) : image (2) : quad mesh (3) : triangle mesh (+), (-) : adjust size of mesh (4) : display / hide mesh";
+const std::string window_name = "(1) : image (2) : result (3) : toggle / hidde mesh (+), (-) : adjust size of mesh (4)(5)(6) : other images";
 
 int target_image_width, target_image_height;
 
 void Initial();
 void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height);
-void StartOpenGL();
 void SaveScreen(const std::string &filename);
 void Exit();
 
-void Display();
-void Reshape(int w, int h);
-void Keyboard(unsigned char key, int x, int y);
-void Mouse(int button, int state, int x, int y);
-void Motion(int x, int y);
+void RenderGL();
+void Reshape(GLFWwindow *window, int w, int h);
+void Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods);
+void Mouse(GLFWwindow *window, int button, int action, int mods);
+void Motion(GLFWwindow *window, double x, double y);
+void Scroll(GLFWwindow *window, double x_offset, double y_offset);
 
 void ChangeGLTexture(void *texture_pointer, int width, int height);
 
@@ -57,7 +58,7 @@ enum ProgramMode {
 
 ProgramMode program_mode;
 
-const float MESH_LINE_WIDTH = 3.0;
+const float MESH_LINE_WIDTH = 3.5;
 const float MESH_POINT_SIZE = 7.5;
 
 const int MIN_MESH_SIZE = 10;
@@ -92,7 +93,7 @@ std::vector<double> saliency_of_mesh_vertex;
 
 bool data_for_warping_were_generated = false;
 
-int window_number;
+GLFWwindow *window;
 
 float eye_z_translation = 0;
 
@@ -104,8 +105,6 @@ int main(int argc, char **argv) {
 
   Initial();
 
-  printf("Input image(%s) size : (%d x %d)\n", input_file_name.c_str(), image.size().width, image.size().height);
-
   //printf("Please input target image width : ");
   //scanf("%d", &target_image_width);
   //printf("Please input target image height : ");
@@ -116,7 +115,11 @@ int main(int argc, char **argv) {
   target_image_height = image.size().height;
   PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
 
-  StartOpenGL();
+  while (!glfwWindowShouldClose(window)) {
+    RenderGL();
+    glfwPollEvents();
+  }
+
   Exit();
 
   return 0;
@@ -126,11 +129,11 @@ void BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height)
   G.V.clear();
   G.E.clear();
 
-  int mesh_column_count = image.size().width / mesh_width;
-  int mesh_row_count = image.size().height / mesh_height;
+  int mesh_column_count = (int)(image.size().width / mesh_width) + 1;
+  int mesh_row_count = (int)(image.size().height / mesh_height) + 1;
 
-  float real_mesh_width = image.size().width / (float)mesh_column_count;
-  float real_mesh_height = image.size().height / (float)mesh_row_count;
+  float real_mesh_width = image.size().width / (float)(mesh_column_count - 1);
+  float real_mesh_height = image.size().height / (float)(mesh_row_count - 1);
 
   quad_mesh_vertex_list.clear();
 
@@ -154,10 +157,10 @@ void BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height)
       vertex_index.push_back(base_index + mesh_column_count + 1);
       vertex_index.push_back(base_index + 1);
 
-      G.E.push_back(Edge(std::pair<int, int>(base_index, base_index + mesh_column_count)));
-      G.E.push_back(Edge(std::pair<int, int>(base_index + mesh_column_count, base_index + mesh_column_count + 1)));
-      G.E.push_back(Edge(std::pair<int, int>(base_index + mesh_column_count + 1, base_index + 1)));
-      G.E.push_back(Edge(std::pair<int, int>(base_index, base_index + 1)));
+      G.E.push_back(Edge(std::pair<int, int>(vertex_index[0], vertex_index[1])));
+      G.E.push_back(Edge(std::pair<int, int>(vertex_index[1], vertex_index[2])));
+      G.E.push_back(Edge(std::pair<int, int>(vertex_index[2], vertex_index[3])));
+      G.E.push_back(Edge(std::pair<int, int>(vertex_index[3], vertex_index[0])));
 
       for (auto it = vertex_index.begin(); it != vertex_index.end(); ++it) {
         FloatPair mesh_vertex = quad_mesh_vertex_list[*it];
@@ -315,16 +318,16 @@ void DrawPolygonMesh(const std::vector<PolygonMesh<float> > &mesh_list, const st
       glLineWidth(MESH_LINE_WIDTH);
       glBegin(GL_LINE_STRIP);
 
+      double vertex_saliency = saliency_of_mesh_vertex[it->vertex_index[0]];
+      if (vertex_saliency < (1 / 3.0)) {
+        glColor3f(0, vertex_saliency * 3.0, 1 - vertex_saliency * 3.0);
+      } else if (vertex_saliency < (2 / 3.0)) {
+        glColor3f((vertex_saliency - (1 / 3.0)) * 3.0, 1.0, 0);
+      } else {
+        glColor3f(1.0, 1.0 - (vertex_saliency - (2 / 3.0)) * 3.0, 0);
+      }
       for (int j = 0; j < vertex_count + 1; ++j) {
         int vertex_index = it->vertex_index[j % vertex_count];
-        double vertex_saliency = saliency_of_mesh_vertex[vertex_index];
-        if (vertex_saliency < (1 / 3.0)) {
-          glColor3f(0, vertex_saliency * 3.0, 1 - vertex_saliency * 3.0);
-        } else if (vertex_saliency < (2 / 3.0)) {
-          glColor3f((vertex_saliency - (1 / 3.0)) * 3.0, 1.0, 0);
-        } else {
-          glColor3f(1.0, 1.0 - (vertex_saliency - (2 / 3.0)) * 3.0, 0);
-        }
         glVertex3f(vertex_list[vertex_index].first, vertex_list[vertex_index].second, 0);
       }
 
@@ -406,23 +409,24 @@ int GetMouseNearestVertexIndex(std::vector<FloatPair> &vertex_list, FloatPair &t
   return selected_index;
 }
 
-void Display() {
+void RenderGL() {
   glClearColor(1.0, 1.0, 1.0, 1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
-  /*
-  gluLookAt(image.size().width / 2.0, image.size().height / 2.0, eye_z_translation + 1e-6,
-  image.size().width / 2.0, image.size().height / 2.0, 0,
-  0, 1, 0
-  );
-  */
-  gluLookAt(0, 0, eye_z_translation + 1e-6,
-    0, 0, 0,
+  int window_width, window_height;
+  glfwGetWindowSize(window, &window_width, &window_height);
+  gluLookAt(window_width / 2.0, window_height / 2.0, eye_z_translation + 1e-6,
+    window_width / 2.0, window_height / 2.0, 0,
     0, 1, 0
     );
+
+  //gluLookAt(0, 0, eye_z_translation + 1e-6,
+  //  0, 0, 0,
+  //  0, 1, 0
+  //  );
 
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_BLEND);
@@ -439,126 +443,135 @@ void Display() {
     break;
   }
 
-  glutSwapBuffers();
+  glfwSwapBuffers(window);
 }
 
-void Keyboard(unsigned char key, int x, int y) {
-  if (key == '1' || key == '2') {
-    cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
-    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
-  }
-  switch (key) {
-  case '1': 
-    program_mode = VIEWING_IMAGE;
-    break;
-  case '2': 
-    program_mode = VIEWING_QUAD_MESH;
-    selected_quad_mesh_vertex_index = -1;
-    break;
-  case '3': 
-    is_viewing_mesh = !is_viewing_mesh;
-    break;
-  case '4':
-    program_mode = VIEWING_IMAGE;
-    cv::cvtColor(image_after_segmentation, image_for_gl_texture, CV_BGR2RGB);
-    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
-    break;
-  case '5':
-    program_mode = VIEWING_IMAGE;
-    cv::cvtColor(saliency_image, image_for_gl_texture, CV_BGR2RGB);
-    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
-    break;
-  case '6':
-    program_mode = VIEWING_IMAGE;
-    cv::cvtColor(significance_image, image_for_gl_texture, CV_BGR2RGB);
-    cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-    ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
-    break;
-  case '7': 
-    program_mode = VIEWING_TRIANGLE_MESH;
-    selected_triangle_mesh_vertex_index = -1;
-    break;
-  case '0': 
-    is_viewing_mesh_point = !is_viewing_mesh_point;
-    break;
-  case '`':
-    SaveScreen("warping_" + input_file_name);
-    break;
-  case 'w':
-    PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
-    break;
-  case '+': 
-    if (program_mode == VIEWING_QUAD_MESH || program_mode == VIEWING_TRIANGLE_MESH) {
-      current_mesh_size += MESH_SIZE_GAP;
-      ReBuildMesh();
+void Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
+  if (action == GLFW_PRESS) {
+    if (key == GLFW_KEY_1 || key == GLFW_KEY_2) {
+      cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
+      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
     }
-    break;
-  case '-':
-    if (program_mode == VIEWING_QUAD_MESH || program_mode == VIEWING_TRIANGLE_MESH) {
-      current_mesh_size -= MESH_SIZE_GAP;
-      ReBuildMesh();
+    switch (key) {
+    case GLFW_KEY_1: 
+      program_mode = VIEWING_IMAGE;
+      break;
+    case GLFW_KEY_2: 
+      program_mode = VIEWING_QUAD_MESH;
+      selected_quad_mesh_vertex_index = -1;
+      break;
+    case GLFW_KEY_3: 
+      is_viewing_mesh = !is_viewing_mesh;
+      break;
+    case GLFW_KEY_4:
+      program_mode = VIEWING_IMAGE;
+      cv::cvtColor(image_after_segmentation, image_for_gl_texture, CV_BGR2RGB);
+      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+      break;
+    case GLFW_KEY_5:
+      program_mode = VIEWING_IMAGE;
+      cv::cvtColor(saliency_image, image_for_gl_texture, CV_BGR2RGB);
+      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+      break;
+    case GLFW_KEY_6:
+      program_mode = VIEWING_IMAGE;
+      cv::cvtColor(significance_image, image_for_gl_texture, CV_BGR2RGB);
+      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+      break;
+    case GLFW_KEY_7: 
+      program_mode = VIEWING_TRIANGLE_MESH;
+      selected_triangle_mesh_vertex_index = -1;
+      break;
+    case GLFW_KEY_0: 
+      is_viewing_mesh_point = !is_viewing_mesh_point;
+      break;
+    case GLFW_KEY_P:
+      SaveScreen("warping_" + input_file_name);
+      break;
+    case GLFW_KEY_W:
+      PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
+      break;
+    case GLFW_KEY_KP_ADD: 
+      if (program_mode == VIEWING_QUAD_MESH || program_mode == VIEWING_TRIANGLE_MESH) {
+        current_mesh_size += MESH_SIZE_GAP;
+        ReBuildMesh();
+      }
+      break;
+    case GLFW_KEY_KP_SUBTRACT:
+      if (program_mode == VIEWING_QUAD_MESH || program_mode == VIEWING_TRIANGLE_MESH) {
+        current_mesh_size -= MESH_SIZE_GAP;
+        ReBuildMesh();
+      }
+      break;
+    case GLFW_KEY_ESCAPE:
+      Exit();
+      break;
     }
-    break;
-  case 27: // ESC
-    Exit();
-    break;
-  }
 
-  if (program_mode == VIEWING_QUAD_MESH) {
-    Reshape(target_image_width, target_image_height);
-  } else {
-    Reshape(image.size().width, image.size().height);
+    if (program_mode == VIEWING_QUAD_MESH) {
+      Reshape(window, target_image_width, target_image_height);
+    } else {
+      Reshape(window, image.size().width, image.size().height);
+    }
   }
-  glutPostRedisplay();
 }
 
-void Reshape(int w, int h) {
+
+void Reshape(GLFWwindow *window, int w, int h) {
   h = h < 1 ? 1 : h;
 
   glViewport(0, 0, w, h);
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  glOrtho(0, w, 0, h, 1.0, 10000.0);
+  //glOrtho(0, w, 0, h, 1.0, 10000.0);
+  gluPerspective(45.0, w / (double)h, 1.0, 10000.0);
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
+  char screen_size_str[20] = {};
   if (program_mode == VIEWING_QUAD_MESH) {
     target_image_width = w;
     target_image_height = h;
-    glutReshapeWindow(target_image_width, target_image_height);
   } else {
-    glutReshapeWindow(image.size().width, image.size().height);
+    w = image.size().width;
+    h = image.size().height;
   }
+
+  sprintf(screen_size_str, "(%04d x %04d)", w, h);
+  glfwSetWindowSize(window, w, h);
+  glfwSetWindowTitle(window, (std::string(screen_size_str) + window_name).c_str());
 }
 
-void Mouse(int button, int state, int x, int y) {
-  if (!state) {
-    float world_x = x;
-    float world_y = image.size().height - y;
+void Mouse(GLFWwindow *window, int button, int action, int mods) {
+  if (action == GLFW_PRESS) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+      //float world_x = x;
+      //float world_y = image.size().height - y;
 
-    FloatPair target(world_x, world_y);
-    float nearest_distance;
-    if (program_mode == VIEWING_QUAD_MESH) {
-      selected_quad_mesh_vertex_index = GetMouseNearestVertexIndex(quad_mesh_vertex_list, target, nearest_distance);
-      if (nearest_distance > MESH_POINT_SIZE * 10) {
-        selected_quad_mesh_vertex_index = -1;
-      }
-    } else if (program_mode == VIEWING_TRIANGLE_MESH) {
-      selected_triangle_mesh_vertex_index = GetMouseNearestVertexIndex(triangle_mesh_vertex_list, target, nearest_distance);
-      if (nearest_distance > MESH_POINT_SIZE * 10) {
-        selected_triangle_mesh_vertex_index = -1;
-      }
+      //FloatPair target(world_x, world_y);
+      //float nearest_distance;
+      //if (program_mode == VIEWING_QUAD_MESH) {
+      //  selected_quad_mesh_vertex_index = GetMouseNearestVertexIndex(quad_mesh_vertex_list, target, nearest_distance);
+      //  if (nearest_distance > MESH_POINT_SIZE * 10) {
+      //    selected_quad_mesh_vertex_index = -1;
+      //  }
+      //} else if (program_mode == VIEWING_TRIANGLE_MESH) {
+      //  selected_triangle_mesh_vertex_index = GetMouseNearestVertexIndex(triangle_mesh_vertex_list, target, nearest_distance);
+      //  if (nearest_distance > MESH_POINT_SIZE * 10) {
+      //    selected_triangle_mesh_vertex_index = -1;
+      //  }
+      //}
     }
   }
-
 }
 
-void Motion(int x, int y) {
+void Motion(GLFWwindow *window, double x, double y) {
   return;
   float world_x = x;
   float world_y = image.size().height - y;
@@ -574,12 +587,15 @@ void Motion(int x, int y) {
       triangle_mesh_vertex_list[selected_triangle_mesh_vertex_index].second = world_y;
     }
   }
+}
 
-  glutPostRedisplay();
+void Scroll(GLFWwindow *window, double x_offset, double y_offset) {
+  const double SCROLLING_SPEED = 25.0;
+  eye_z_translation -= y_offset * SCROLLING_SPEED;
 }
 
 void ChangeGLTexture(void *texture_pointer, int width, int height) {
-  glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_pointer);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_pointer);
 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
@@ -588,28 +604,42 @@ void ChangeGLTexture(void *texture_pointer, int width, int height) {
 }
 
 void Initial() {
+  if (!glfwInit ()) {
+    exit(EXIT_FAILURE);
+  }
+
   printf("Start : Read image %s\n", input_file_name.c_str());
   image = cv::imread(input_file_name);
+  printf("Input image(%s) size : (%d x %d)\n", input_file_name.c_str(), image.size().width, image.size().height);
   printf("Done : Read image %s\n", input_file_name.c_str());
 
-  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-  glutInitWindowSize(image.size().width, image.size().height);
-  window_number = glutCreateWindow(window_name);
+  window = glfwCreateWindow(image.size().width, image.size().height, window_name.c_str(), NULL, NULL);
+  if (!window) {
+    glfwTerminate();
+    exit( EXIT_FAILURE );
+  }
+
+  glewExperimental = GL_TRUE;
+  glewInit();
+
+  BuildTriangleMesh();
+
+  glfwSetFramebufferSizeCallback(window, Reshape);
+  glfwSetKeyCallback(window, Keyboard);
+  glfwSetMouseButtonCallback(window, Mouse);
+  glfwSetCursorPosCallback(window, Motion);
+  glfwSetScrollCallback(window, Scroll);
+
+  glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);
+
+  double cotanget_of_half_of_fovy = 1.0 / tan(22.5 * acos(-1.0) / 180.0);
+  eye_z_translation = cotanget_of_half_of_fovy * (image.size().height / 2.0);
+
 
   cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
   cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
   ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
-
-  BuildTriangleMesh();
-
-  glutReshapeFunc(Reshape);
-  glutKeyboardFunc(Keyboard);
-  glutMouseFunc(Mouse);
-  glutMotionFunc(Motion);
-  glutDisplayFunc(Display);
-
-  double cotanget_of_half_of_fovy = 1.0 / tan(22.5 * acos(-1.0) / 180.0);
-  eye_z_translation = cotanget_of_half_of_fovy * (image.size().height / 2.0);
 }
 
 void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
@@ -637,11 +667,18 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
     cv::imwrite("saliency_" + input_file_name, saliency_image);
 
     // Calculate the saliency value of each patch
-    saliency_of_patch.clear();
-    saliency_of_patch = std::vector<double>(image.size().width * image.size().height);
-    std::vector<int> group_count(image.size().width * image.size().height);
     for (int r = 0; r < image.size().height; ++r) {
-      for (int c = 0; c < image.size().width; ++c) {
+      saliency_map[r].push_back(saliency_map[r].back());
+      group_of_pixel[r].push_back(group_of_pixel[r].back());
+    }
+    saliency_map.push_back(saliency_map.back());
+    group_of_pixel.push_back(group_of_pixel.back());
+
+    saliency_of_patch.clear();
+    saliency_of_patch = std::vector<double>((image.size().width + 1) * (image.size().height + 1));
+    std::vector<int> group_count((image.size().width + 1) * (image.size().height + 1));
+    for (int r = 0; r < image.size().height + 1; ++r) {
+      for (int c = 0; c < image.size().width + 1; ++c) {
         ++group_count[group_of_pixel[r][c]];
         saliency_of_patch[group_of_pixel[r][c]] += saliency_map[r][c];
       }
@@ -688,30 +725,32 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
   BuildQuadMeshWithGraph(image_graph, mesh_width, mesh_height);
   puts("Done : Build mesh and graph");
 
-  puts("Start : Image warping");
-  Warping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height);
-  puts("Done : Image warping");
-  printf("New image size : %d %d\n", target_image_width, target_image_height);
+  if (target_image_width == image.size().width && target_image_height == image.size().height) {
+  } else {
+    puts("Start : Image warping");
+    Warping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height);
+    puts("Done : Image warping");
+    printf("New image size : %d %d\n", target_image_width, target_image_height);
+  }
 
   saliency_of_mesh_vertex.clear();
   saliency_of_mesh_vertex = std::vector<double>(image_graph.V.size());
 
   for (size_t vertex_index = 0; vertex_index < image_graph.V.size(); ++vertex_index) {
-    saliency_of_mesh_vertex[vertex_index] = saliency_of_patch[group_of_pixel[quad_mesh_vertex_list[vertex_index].second][quad_mesh_vertex_list[vertex_index].first]];
+    float original_x = quad_mesh_vertex_list[vertex_index].first;
+    float original_y = quad_mesh_vertex_list[vertex_index].second;
+    saliency_of_mesh_vertex[vertex_index] = saliency_of_patch[group_of_pixel[original_y][original_x]];
     quad_mesh_vertex_list[vertex_index].first = image_graph.V[vertex_index].first;
     quad_mesh_vertex_list[vertex_index].second = image_graph.V[vertex_index].second;
   }
 
   program_mode = VIEWING_QUAD_MESH;
   selected_quad_mesh_vertex_index = -1;
-  Reshape(target_image_width, target_image_height);
-}
-
-void StartOpenGL() {
-  glutMainLoop();
+  Reshape(window, target_image_width, target_image_height);
 }
 
 void SaveScreen(const std::string &filename) {
+  printf("Screen saved : %s\n", filename);
   unsigned char *image_after_warping_data = new unsigned char[3 * target_image_width * target_image_height];
   glReadPixels(0, 0, target_image_width, target_image_height, GL_RGB, GL_UNSIGNED_BYTE, image_after_warping_data);
   cv::Mat image_after_warping(target_image_height, target_image_width, image.type(), image_after_warping_data);
@@ -722,6 +761,6 @@ void SaveScreen(const std::string &filename) {
 }
 
 void Exit() {
-  glutDestroyWindow(window_number);
+  glfwTerminate();
   exit(0);
 }

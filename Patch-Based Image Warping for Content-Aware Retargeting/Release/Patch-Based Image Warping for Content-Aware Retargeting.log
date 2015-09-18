@@ -1,10 +1,58 @@
-﻿Build started 9/17/2015 9:02:16 PM.
+﻿Build started 2015/9/18 下午 05:43:29.
      1>Project "D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\CL.exe /c /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc110.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp
          main.cpp
+     1>main.cpp(323): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
+     1>main.cpp(325): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
+     1>main.cpp(327): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
+     1>main.cpp(576): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
+     1>main.cpp(577): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
+     1>main.cpp(594): warning C4244: '-=' : conversion from 'double' to 'float', possible loss of data
+     1>main.cpp(637): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>main.cpp(659): warning C4244: 'argument' : conversion from 'const double' to 'const int', possible loss of data
+     1>main.cpp(706): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(707): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(709): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(710): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(712): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(713): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(742): warning C4244: 'argument' : conversion from 'float' to 'unsigned int', possible loss of data
+     1>main.cpp(743): warning C4244: '=' : conversion from 'int' to 'float', possible loss of data
+     1>main.cpp(744): warning C4244: '=' : conversion from 'int' to 'float', possible loss of data
+     1>C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include\utility(100): warning C4244: 'initializing' : conversion from 'const float' to 'int', possible loss of data
+                 main.cpp(143) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<float,float>(const std::pair<float,float> &,void **)' being compiled
+                 with
+                 [
+                     _Ty1=int,
+                     _Ty2=int
+                 ]
+                 main.cpp(143) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<float,float>(const std::pair<float,float> &,void **)' being compiled
+                 with
+                 [
+                     _Ty1=int,
+                     _Ty2=int
+                 ]
+     1>C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include\utility(138): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
+                 main.cpp(257) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<double&,double&>(_Other1,_Other2,void **)' being compiled
+                 with
+                 [
+                     _Ty1=float,
+                     _Ty2=float,
+                     _Other1=double &,
+                     _Other2=double &
+                 ]
+                 main.cpp(257) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<double&,double&>(_Other1,_Other2,void **)' being compiled
+                 with
+                 [
+                     _Ty1=float,
+                     _Ty2=float,
+                     _Other1=double &,
+                     _Other2=double &
+                 ]
+     1>C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include\utility(138): warning C4244: 'initializing' : conversion from 'int' to 'float', possible loss of data
        Link:
-         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Release\Patch-Based Image Warping for Content-Aware Retargeting.exe" /INCREMENTAL:NO /NOLOGO cplex1260.lib ilocplex.lib concert.lib opencv_core2411.lib opencv_highgui2411.lib opencv_imgproc2411.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Release\Patch-Based Image Warping for Content-Aware Retargeting.pdb" /SUBSYSTEM:CONSOLE /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Release\Patch-Based Image Warping for Content-Aware Retargeting.lib" /MACHINE:X86 /SAFESEH:NO Release\triangle.obj
+         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Release\Patch-Based Image Warping for Content-Aware Retargeting.exe" /INCREMENTAL:NO /NOLOGO glew32.lib glew32s.lib glfw3.lib glfw3dll.lib opengl32.lib glu32.lib cplex1260.lib ilocplex.lib concert.lib opencv_core2411.lib opencv_highgui2411.lib opencv_imgproc2411.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Release\Patch-Based Image Warping for Content-Aware Retargeting.pdb" /SUBSYSTEM:CONSOLE /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Release\Patch-Based Image Warping for Content-Aware Retargeting.lib" /MACHINE:X86 /SAFESEH:NO Release\triangle.obj
          Release\main.obj
          Generating code
          Finished generating code
@@ -50,4 +98,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:05.04
+Time Elapsed 00:00:03.99

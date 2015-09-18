@@ -150,7 +150,7 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
       int group = vertex_disjoint_set.FindGroup(index);
       group_of_pixel[r][c] = group;
       for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
-        image_after_segmentation.at<cv::Vec3b>(r, c).val[pixel_index] = group_color[group].val[pixel_index];
+        image_after_segmentation.at<cv::Vec3b>(r, c).val[pixel_index] = (unsigned char)group_color[group].val[pixel_index];
       }
     }
   }
