@@ -19,7 +19,7 @@
 #include "triangle.h"
 #include "warping.h"
 
-typedef Graph2D<int> GraphType;
+typedef Graph2D<float> GraphType;
 
 typedef std::pair<float, float> FloatPair;
 
@@ -58,13 +58,13 @@ enum ProgramMode {
 
 ProgramMode program_mode;
 
-const float MESH_LINE_WIDTH = 3.5;
+const float MESH_LINE_WIDTH = 4.5;
 const float MESH_POINT_SIZE = 7.5;
 
 const int MIN_MESH_SIZE = 10;
 const int MAX_MESH_SIZE = 120;
 const int MESH_SIZE_GAP = 10;
-int current_mesh_size = 20;
+int current_mesh_size = 40;
 
 bool is_viewing_mesh = true;
 bool is_viewing_mesh_point = false;
@@ -95,7 +95,10 @@ bool data_for_warping_were_generated = false;
 
 GLFWwindow *window;
 
-float eye_z_translation = 0;
+float eye_x_offset = 0;
+float eye_y_offset = 0;
+float eye_z_offset = 0;
+const float EYE_TRANSLATION_OFFSET_GAP = 25.0;
 
 int main(int argc, char **argv) {
 
@@ -157,10 +160,14 @@ void BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height)
       vertex_index.push_back(base_index + mesh_column_count + 1);
       vertex_index.push_back(base_index + 1);
 
-      G.E.push_back(Edge(std::pair<int, int>(vertex_index[0], vertex_index[1])));
+      if (!c) {
+        G.E.push_back(Edge(std::pair<int, int>(vertex_index[0], vertex_index[1])));
+      }
       G.E.push_back(Edge(std::pair<int, int>(vertex_index[1], vertex_index[2])));
       G.E.push_back(Edge(std::pair<int, int>(vertex_index[2], vertex_index[3])));
-      G.E.push_back(Edge(std::pair<int, int>(vertex_index[3], vertex_index[0])));
+      if (!r) {
+        G.E.push_back(Edge(std::pair<int, int>(vertex_index[3], vertex_index[0])));
+      }
 
       for (auto it = vertex_index.begin(); it != vertex_index.end(); ++it) {
         FloatPair mesh_vertex = quad_mesh_vertex_list[*it];
@@ -418,12 +425,12 @@ void RenderGL() {
 
   int window_width, window_height;
   glfwGetWindowSize(window, &window_width, &window_height);
-  gluLookAt(window_width / 2.0, window_height / 2.0, eye_z_translation + 1e-6,
-    window_width / 2.0, window_height / 2.0, 0,
+  gluLookAt(window_width / 2.0 + eye_x_offset, window_height / 2.0 + eye_y_offset, 0 + eye_z_offset + 1e-6,
+    window_width / 2.0 + eye_x_offset, window_height / 2.0 + eye_y_offset, 0,
     0, 1, 0
     );
 
-  //gluLookAt(0, 0, eye_z_translation + 1e-6,
+  //gluLookAt(0, 0, eye_z_offset + 1e-6,
   //  0, 0, 0,
   //  0, 1, 0
   //  );
@@ -506,6 +513,18 @@ void Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
         current_mesh_size -= MESH_SIZE_GAP;
         ReBuildMesh();
       }
+      break;
+    case GLFW_KEY_UP:
+      eye_y_offset += EYE_TRANSLATION_OFFSET_GAP;
+      break;
+    case GLFW_KEY_DOWN:
+      eye_y_offset -= EYE_TRANSLATION_OFFSET_GAP;
+      break;
+    case GLFW_KEY_LEFT:
+      eye_x_offset -= EYE_TRANSLATION_OFFSET_GAP;
+      break;
+    case GLFW_KEY_RIGHT:
+      eye_x_offset += EYE_TRANSLATION_OFFSET_GAP;
       break;
     case GLFW_KEY_ESCAPE:
       Exit();
@@ -590,8 +609,7 @@ void Motion(GLFWwindow *window, double x, double y) {
 }
 
 void Scroll(GLFWwindow *window, double x_offset, double y_offset) {
-  const double SCROLLING_SPEED = 25.0;
-  eye_z_translation -= y_offset * SCROLLING_SPEED;
+  eye_z_offset -= y_offset * EYE_TRANSLATION_OFFSET_GAP;
 }
 
 void ChangeGLTexture(void *texture_pointer, int width, int height) {
@@ -616,7 +634,7 @@ void Initial() {
   window = glfwCreateWindow(image.size().width, image.size().height, window_name.c_str(), NULL, NULL);
   if (!window) {
     glfwTerminate();
-    exit( EXIT_FAILURE );
+    exit(EXIT_FAILURE);
   }
 
   glewExperimental = GL_TRUE;
@@ -634,8 +652,7 @@ void Initial() {
   glfwSwapInterval(1);
 
   double cotanget_of_half_of_fovy = 1.0 / tan(22.5 * acos(-1.0) / 180.0);
-  eye_z_translation = cotanget_of_half_of_fovy * (image.size().height / 2.0);
-
+  eye_z_offset = cotanget_of_half_of_fovy * (image.size().height / 2.0);
 
   cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
   cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
@@ -726,9 +743,12 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
   puts("Done : Build mesh and graph");
 
   if (target_image_width == image.size().width && target_image_height == image.size().height) {
+    puts("Start : Image warping");
+    FocusWarping(image, image_graph, saliency_map, mesh_width, mesh_height);
+    puts("Done : Image warping");
   } else {
     puts("Start : Image warping");
-    Warping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height);
+    PatchBasedWarping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height);
     puts("Done : Image warping");
     printf("New image size : %d %d\n", target_image_width, target_image_height);
   }
@@ -747,6 +767,9 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
   program_mode = VIEWING_QUAD_MESH;
   selected_quad_mesh_vertex_index = -1;
   Reshape(window, target_image_width, target_image_height);
+
+  double cotanget_of_half_of_fovy = 1.0 / tan(22.5 * acos(-1.0) / 180.0);
+  eye_z_offset = cotanget_of_half_of_fovy * (target_image_height / 2.0);
 }
 
 void SaveScreen(const std::string &filename) {

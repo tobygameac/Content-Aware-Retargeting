@@ -9,8 +9,7 @@
 #include "graph.h"
 #include "disjoint_set.h"
 
-
-typedef Graph2D<int> GraphType;
+typedef Graph2D<float> GraphType;
 
 void BuildGraphFromImage(const cv::Mat &image, GraphType &G) {
   G.V.clear();
