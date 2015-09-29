@@ -1,4 +1,4 @@
-﻿Build started 2015/9/25 下午 04:45:39.
+﻿Build started 2015/9/29 下午 04:31:07.
      1>Project "D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\CL.exe /c /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc110.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp
@@ -8,24 +8,22 @@
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(181): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(182): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(212): warning C4244: 'argument' : conversion from 'float' to 'unsigned int', possible loss of data
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(327): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(328): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
-     1>main.cpp(330): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(299): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(300): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
      1>main.cpp(332): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
      1>main.cpp(334): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
-     1>main.cpp(595): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-     1>main.cpp(596): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-     1>main.cpp(612): warning C4244: '-=' : conversion from 'double' to 'float', possible loss of data
-     1>main.cpp(655): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
-     1>main.cpp(676): warning C4244: 'argument' : conversion from 'const double' to 'const int', possible loss of data
-     1>main.cpp(723): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
-     1>main.cpp(724): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
-     1>main.cpp(726): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
-     1>main.cpp(727): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
-     1>main.cpp(729): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
-     1>main.cpp(730): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
-     1>main.cpp(762): warning C4244: 'argument' : conversion from 'float' to 'unsigned int', possible loss of data
-     1>main.cpp(772): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>main.cpp(336): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
+     1>main.cpp(620): warning C4244: '-=' : conversion from 'double' to 'float', possible loss of data
+     1>main.cpp(663): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
+     1>main.cpp(687): warning C4244: 'argument' : conversion from 'const double' to 'const int', possible loss of data
+     1>main.cpp(734): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(735): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(737): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(738): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(740): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(741): warning C4244: '=' : conversion from 'double' to 'uchar', possible loss of data
+     1>main.cpp(773): warning C4244: 'argument' : conversion from 'float' to 'unsigned int', possible loss of data
+     1>main.cpp(783): warning C4244: '=' : conversion from 'double' to 'float', possible loss of data
      1>C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include\utility(182): warning C4244: 'initializing' : conversion from 'int' to 'float', possible loss of data
                  d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\segmentation.h(26) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<int,int>(std::pair<int,int> &&,void **)' being compiled
                  with
@@ -40,7 +38,7 @@
                      _Ty2=float
                  ]
      1>C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\include\utility(138): warning C4244: 'initializing' : conversion from 'double' to 'float', possible loss of data
-                 main.cpp(264) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<double&,double&>(_Other1,_Other2,void **)' being compiled
+                 main.cpp(266) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<double&,double&>(_Other1,_Other2,void **)' being compiled
                  with
                  [
                      _Ty1=float,
@@ -48,7 +46,7 @@
                      _Other1=double &,
                      _Other2=double &
                  ]
-                 main.cpp(264) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<double&,double&>(_Other1,_Other2,void **)' being compiled
+                 main.cpp(266) : see reference to function template instantiation 'std::pair<_Ty1,_Ty2>::pair<double&,double&>(_Other1,_Other2,void **)' being compiled
                  with
                  [
                      _Ty1=float,
@@ -104,4 +102,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:04.15
+Time Elapsed 00:00:04.11

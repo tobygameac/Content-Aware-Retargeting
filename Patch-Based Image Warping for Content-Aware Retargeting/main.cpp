@@ -64,7 +64,9 @@ const float MESH_POINT_SIZE = 7.5;
 const int MIN_MESH_SIZE = 10;
 const int MAX_MESH_SIZE = 120;
 const int MESH_SIZE_GAP = 10;
-int current_mesh_size = 40;
+int current_mesh_size = 100;
+double focus_x;
+double focus_y;
 
 bool is_viewing_mesh = true;
 bool is_viewing_mesh_point = false;
@@ -591,21 +593,27 @@ void Mouse(GLFWwindow *window, int button, int action, int mods) {
 }
 
 void Motion(GLFWwindow *window, double x, double y) {
-  return;
-  float world_x = x;
-  float world_y = image.size().height - y;
-
-  if (program_mode == VIEWING_QUAD_MESH) {
-    if (selected_quad_mesh_vertex_index != -1) {
-      quad_mesh_vertex_list[selected_quad_mesh_vertex_index].first = world_x;
-      quad_mesh_vertex_list[selected_quad_mesh_vertex_index].second = world_y;
+  if (image.size().width == target_image_width && image.size().height == target_image_height) {
+    double new_focus_x = x;
+    double new_focus_y = image.size().height - y;
+    if (std::abs(new_focus_x - focus_x) >= 1e-3 || std::abs(new_focus_y - focus_y) >= 1e-3) {
+      PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
     }
-  } else if (program_mode == VIEWING_TRIANGLE_MESH) {
-    if (selected_triangle_mesh_vertex_index != -1) {
-      triangle_mesh_vertex_list[selected_triangle_mesh_vertex_index].first = world_x;
-      triangle_mesh_vertex_list[selected_triangle_mesh_vertex_index].second = world_y;
-    }
+    focus_x = new_focus_x;
+    focus_y = new_focus_y;
   }
+
+  //if (program_mode == VIEWING_QUAD_MESH) {
+  //  if (selected_quad_mesh_vertex_index != -1) {
+  //    quad_mesh_vertex_list[selected_quad_mesh_vertex_index].first = x;
+  //    quad_mesh_vertex_list[selected_quad_mesh_vertex_index].second = y;
+  //  }
+  //} else if (program_mode == VIEWING_TRIANGLE_MESH) {
+  //  if (selected_triangle_mesh_vertex_index != -1) {
+  //    triangle_mesh_vertex_list[selected_triangle_mesh_vertex_index].first = x;
+  //    triangle_mesh_vertex_list[selected_triangle_mesh_vertex_index].second = y;
+  //  }
+  //}
 }
 
 void Scroll(GLFWwindow *window, double x_offset, double y_offset) {
@@ -657,6 +665,9 @@ void Initial() {
   cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
   cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
   ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+
+  focus_x = image.size().width / 2.0;
+  focus_y = image.size().height / 2.0;
 }
 
 void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
@@ -744,7 +755,7 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
 
   if (target_image_width == image.size().width && target_image_height == image.size().height) {
     puts("Start : Image warping");
-    FocusWarping(image, image_graph, saliency_map, mesh_width, mesh_height);
+    FocusWarping(image, image_graph, saliency_map, mesh_width, mesh_height, focus_x, focus_y);
     puts("Done : Image warping");
   } else {
     puts("Start : Image warping");

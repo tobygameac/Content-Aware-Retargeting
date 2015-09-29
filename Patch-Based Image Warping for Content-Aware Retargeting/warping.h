@@ -185,7 +185,7 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
   cplex.end();
 }
 
-void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<double> > &saliency_map, const double mesh_width, const double mesh_height) {
+void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<double> > &saliency_map, const double mesh_width, const double mesh_height, const double focus_x, const double focus_y) {
   IloEnv env;
 
   IloNumVarArray x(env);
@@ -199,73 +199,46 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   int mesh_column_count = (int)(image.size().width / mesh_width) + 1;
   int mesh_row_count = (int)(image.size().height / mesh_height) + 1;
 
-  const double K = 2;
-  const double ORIENTATION_WEIGHT = 10.0;
+  const double MESH_SCALE_SIZE = 8;
+  const double ORIENTATION_WEIGHT = 5;
+  const double DISTORTION_WEIGHT = 1;
 
   for (size_t edge_index = 0; edge_index < G.E.size(); ++edge_index) {
     int vertex_index_1 = G.E[edge_index].e.first;
     int vertex_index_2 = G.E[edge_index].e.second;
-    float delta_x = abs(G.V[vertex_index_1].first - G.V[vertex_index_2].first);
-    float delta_y = abs(G.V[vertex_index_1].second - G.V[vertex_index_2].second);
+    float delta_x = G.V[vertex_index_1].first - G.V[vertex_index_2].first;
+    float delta_y = G.V[vertex_index_1].second - G.V[vertex_index_2].second;
 
-    double saliency_value = (saliency_map[G.V[vertex_index_1].first][G.V[vertex_index_1].second] + saliency_map[G.V[vertex_index_2].first][G.V[vertex_index_2].second]) * 0.5;
+    double saliency_value = (saliency_map[G.V[vertex_index_1].second][G.V[vertex_index_1].first] + saliency_map[G.V[vertex_index_2].second][G.V[vertex_index_2].first]) * 0.5;
+    saliency_value = 0;
+    saliency_value += pow((G.V[vertex_index_1].first + G.V[vertex_index_2].first) / 2.0 - focus_x, 2.0);
+    saliency_value += pow((G.V[vertex_index_1].second + G.V[vertex_index_2].second) / 2.0 - focus_y, 2.0);
+    saliency_value = sqrt(saliency_value);
+    saliency_value /= sqrt(std::max(pow(focus_x, 2.0), pow(image.size().width - focus_x, 2.0)) + std::max(pow(focus_y, 2.0), pow(image.size().height - focus_y, 2.0)));
+    saliency_value = 1 - saliency_value;
 
-    double mesh_size_scale = (saliency_value < 0.5) ? (saliency_value * 2) : (1.0 + (saliency_value - 0.5) * K);
-    double new_mesh_width = mesh_size_scale * mesh_width;
-    double new_mesh_height = mesh_size_scale * mesh_height;
-
-    if (delta_x > delta_y) { // Horizontal
-      expr += IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2.0) + IloPower(x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1], 2.0) - pow(new_mesh_width, 2.0);
+    if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
+      expr += saliency_value * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - MESH_SCALE_SIZE * delta_x, 2);
     } else {
-      expr += IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2.0) + IloPower(x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1], 2.0) - pow(new_mesh_height, 2.0);
+      expr += saliency_value * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - MESH_SCALE_SIZE * delta_y, 2);
     }
   }
 
-  //for (int row = 0; row < mesh_row_count - 1; ++row) {
-  //  for (int column = 0; column < mesh_column_count - 1; ++column) {
-  //    int base_index = row * (mesh_column_count) + column;
-  //    int vertex_index[4];
-  //    vertex_index[0] = base_index;
-  //    vertex_index[1] = base_index + column;
-  //    vertex_index[2] = base_index + column + 1;
-  //    vertex_index[3] = base_index + 1;
-
-  //    double saliency_value[4], average_saliency_value = 0;
-  //    for (int i = 0; i < 4; ++i) {
-  //      saliency_value[i] = saliency_map[G.V[vertex_index[i]].first][G.V[vertex_index[i]].second];
-  //      average_saliency_value += saliency_value[i];
-  //    }
-  //    average_saliency_value /= 4.0;
-
-  //    double mesh_size_scale = (average_saliency_value < 0.5) ? (average_saliency_value * 2) : (1.0 + (average_saliency_value - 0.5) * K);
-  //    double new_mesh_width = mesh_size_scale * mesh_width;
-  //    double new_mesh_height = mesh_size_scale * mesh_height;
-
-  //    if (!row) {
-  //      expr += IloPower(x[vertex_index[0] * 2] - x[vertex_index[3] * 2], 2.0) + IloPower(x[vertex_index[0] * 2 + 1] - x[vertex_index[3] * 2 + 1], 2.0) - pow(new_mesh_width, 2.0);
-  //    }
-
-  //    if (!column) {
-  //      expr += IloPower(x[vertex_index[1] * 2] - x[vertex_index[2] * 2], 2.0) + IloPower(x[vertex_index[1] * 2 + 1] - x[vertex_index[2] * 2 + 1], 2.0) - pow(new_mesh_width, 2.0);
-  //    }
-
-  //    expr += IloPower(x[vertex_index[0] * 2] - x[vertex_index[1] * 2], 2.0) + IloPower(x[vertex_index[0] * 2 + 1] - x[vertex_index[1] * 2 + 1], 2.0) - pow(new_mesh_height, 2.0);
-  //    expr += IloPower(x[vertex_index[2] * 2] - x[vertex_index[3] * 2], 2.0) + IloPower(x[vertex_index[2] * 2 + 1] - x[vertex_index[3] * 2 + 1], 2.0) - pow(new_mesh_height, 2.0);
-  //  }
-  //}
-
-  // Grid orientation constraint
+  // Grid orientation & distortion constraint
   for (size_t edge_index = 0; edge_index < G.E.size(); ++edge_index) {
     int vertex_index_1 = G.E[edge_index].e.first;
     int vertex_index_2 = G.E[edge_index].e.second;
-    float delta_x = abs(G.V[vertex_index_1].first - G.V[vertex_index_2].first);
-    float delta_y = abs(G.V[vertex_index_1].second - G.V[vertex_index_2].second);
-    if (delta_x > delta_y) { // Horizontal
+    float delta_x = G.V[vertex_index_1].first - G.V[vertex_index_2].first;
+    float delta_y = G.V[vertex_index_1].second - G.V[vertex_index_2].second;
+    if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
       expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1], 2);
+      expr += DISTORTION_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - delta_x, 2);
     } else {
       expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2);
+      expr += DISTORTION_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - delta_y, 2);
     }
   }
+
 
   IloModel model(env);
 
@@ -311,7 +284,7 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
 
   IloCplex cplex(model);
 
-  //cplex.setOut(env.getNullStream());
+  cplex.setOut(env.getNullStream());
 
   if (!cplex.solve()) {
     puts("Failed to optimize the model.");
@@ -322,7 +295,7 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   cplex.getValues(result, x);
 
   for (size_t vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
-    printf("(%.0f, %.0f) -> (%.0f, %.0f)\n", G.V[vertex_index].first , G.V[vertex_index].second, result[vertex_index * 2], result[vertex_index * 2 + 1]);
+    //printf("(%.0f, %.0f) -> (%.0f, %.0f)\n", G.V[vertex_index].first , G.V[vertex_index].second, result[vertex_index * 2], result[vertex_index * 2 + 1]);
     G.V[vertex_index].first = result[vertex_index * 2];
     G.V[vertex_index].second = result[vertex_index * 2 + 1];
   }
