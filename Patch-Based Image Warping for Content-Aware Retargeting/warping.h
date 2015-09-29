@@ -183,6 +183,7 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
   }
 
   cplex.end();
+  env.end();
 }
 
 void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<double> > &saliency_map, const double mesh_width, const double mesh_height, const double focus_x, const double focus_y) {
@@ -199,9 +200,10 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   int mesh_column_count = (int)(image.size().width / mesh_width) + 1;
   int mesh_row_count = (int)(image.size().height / mesh_height) + 1;
 
-  const double MESH_SCALE_SIZE = 8;
-  const double ORIENTATION_WEIGHT = 5;
-  const double DISTORTION_WEIGHT = 1;
+  const double MESH_SCALE_SIZE = 3.5;
+  const double FOCUS_WEIGHT = 5.0;
+  const double ORIENTATION_WEIGHT = 10.0;
+  const double DISTORTION_WEIGHT = 5.0;
 
   for (size_t edge_index = 0; edge_index < G.E.size(); ++edge_index) {
     int vertex_index_1 = G.E[edge_index].e.first;
@@ -209,18 +211,23 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
     float delta_x = G.V[vertex_index_1].first - G.V[vertex_index_2].first;
     float delta_y = G.V[vertex_index_1].second - G.V[vertex_index_2].second;
 
-    double saliency_value = (saliency_map[G.V[vertex_index_1].second][G.V[vertex_index_1].first] + saliency_map[G.V[vertex_index_2].second][G.V[vertex_index_2].first]) * 0.5;
-    saliency_value = 0;
-    saliency_value += pow((G.V[vertex_index_1].first + G.V[vertex_index_2].first) / 2.0 - focus_x, 2.0);
-    saliency_value += pow((G.V[vertex_index_1].second + G.V[vertex_index_2].second) / 2.0 - focus_y, 2.0);
-    saliency_value = sqrt(saliency_value);
-    saliency_value /= sqrt(std::max(pow(focus_x, 2.0), pow(image.size().width - focus_x, 2.0)) + std::max(pow(focus_y, 2.0), pow(image.size().height - focus_y, 2.0)));
-    saliency_value = 1 - saliency_value;
+    //double saliency_value = (saliency_map[G.V[vertex_index_1].second][G.V[vertex_index_1].first] + saliency_map[G.V[vertex_index_2].second][G.V[vertex_index_2].first]) * 0.5;
+
+    double distance_to_focus_point = 0;
+    distance_to_focus_point += pow((G.V[vertex_index_1].first + G.V[vertex_index_2].first) / 2.0 - focus_x, 2.0);
+    distance_to_focus_point += pow((G.V[vertex_index_1].second + G.V[vertex_index_2].second) / 2.0 - focus_y, 2.0);
+    distance_to_focus_point = sqrt(distance_to_focus_point);
+
+    // Normalize distance value to [0, 1]
+    distance_to_focus_point /= sqrt(std::max(pow(focus_x, 2.0), pow(image.size().width - focus_x, 2.0)) + std::max(pow(focus_y, 2.0), pow(image.size().height - focus_y, 2.0)));
+
+    distance_to_focus_point = 1 - distance_to_focus_point;
+    distance_to_focus_point = pow(distance_to_focus_point, 4.0);
 
     if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
-      expr += saliency_value * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - MESH_SCALE_SIZE * delta_x, 2);
+      expr += FOCUS_WEIGHT * distance_to_focus_point * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - MESH_SCALE_SIZE * delta_x, 2);
     } else {
-      expr += saliency_value * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - MESH_SCALE_SIZE * delta_y, 2);
+      expr += FOCUS_WEIGHT * distance_to_focus_point * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - MESH_SCALE_SIZE * delta_y, 2);
     }
   }
 
@@ -264,21 +271,21 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   }
 
   // Avoid flipping
-  for (int row = 0; row < mesh_row_count; ++row) {
-    for (int column = 1; column < mesh_column_count; ++column) {
-      int vertex_index_right = row * mesh_column_count + column;
-      int vertex_index_left = row * mesh_column_count + column - 1;
-      c.add((x[vertex_index_right * 2] - x[vertex_index_left * 2]) >= 1e-4);
-    }
-  }
+  //for (int row = 0; row < mesh_row_count; ++row) {
+  //  for (int column = 1; column < mesh_column_count; ++column) {
+  //    int vertex_index_right = row * mesh_column_count + column;
+  //    int vertex_index_left = row * mesh_column_count + column - 1;
+  //    c.add((x[vertex_index_right * 2] - x[vertex_index_left * 2]) >= 1e-4);
+  //  }
+  //}
 
-  for (int row = 1; row < mesh_row_count; ++row) {
-    for (int column = 0; column < mesh_column_count; ++column) {
-      int vertex_index_down = row * mesh_column_count + column;
-      int vertex_index_up = (row - 1) * mesh_column_count + column;
-      c.add((x[vertex_index_down * 2 + 1] - x[vertex_index_up * 2 + 1]) >= 1e-4);
-    }
-  }
+  //for (int row = 1; row < mesh_row_count; ++row) {
+  //  for (int column = 0; column < mesh_column_count; ++column) {
+  //    int vertex_index_down = row * mesh_column_count + column;
+  //    int vertex_index_up = (row - 1) * mesh_column_count + column;
+  //    c.add((x[vertex_index_down * 2 + 1] - x[vertex_index_up * 2 + 1]) >= 1e-4);
+  //  }
+  //}
 
   model.add(c);
 
@@ -301,6 +308,7 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   }
 
   cplex.end();
+  env.end();
 }
 
 #endif

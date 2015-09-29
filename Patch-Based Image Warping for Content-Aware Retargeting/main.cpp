@@ -64,7 +64,7 @@ const float MESH_POINT_SIZE = 7.5;
 const int MIN_MESH_SIZE = 10;
 const int MAX_MESH_SIZE = 120;
 const int MESH_SIZE_GAP = 10;
-int current_mesh_size = 100;
+int current_mesh_size = 70;
 double focus_x;
 double focus_y;
 

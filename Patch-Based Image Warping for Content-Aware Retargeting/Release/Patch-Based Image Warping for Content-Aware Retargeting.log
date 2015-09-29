@@ -1,4 +1,4 @@
-﻿Build started 2015/9/29 下午 04:31:07.
+﻿Build started 2015/9/29 下午 05:16:45.
      1>Project "D:\Dropbox\Programming\Projects\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting\Patch-Based Image Warping for Content-Aware Retargeting.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\CL.exe /c /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc110.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp
@@ -7,9 +7,8 @@
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(28): warning C4244: 'argument' : conversion from 'float' to 'unsigned int', possible loss of data
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(181): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
      1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(182): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(212): warning C4244: 'argument' : conversion from 'float' to 'unsigned int', possible loss of data
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(299): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
-     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(300): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(306): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
+     1>d:\dropbox\programming\projects\patch-based image warping for content-aware retargeting\patch-based image warping for content-aware retargeting\warping.h(307): warning C4244: '=' : conversion from 'IloNum' to 'float', possible loss of data
      1>main.cpp(332): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
      1>main.cpp(334): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
      1>main.cpp(336): warning C4244: 'argument' : conversion from 'double' to 'GLfloat', possible loss of data
@@ -102,4 +101,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:04.11
+Time Elapsed 00:00:04.17
