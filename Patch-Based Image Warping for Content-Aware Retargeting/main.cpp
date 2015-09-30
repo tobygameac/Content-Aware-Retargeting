@@ -23,8 +23,8 @@ typedef Graph2D<float> GraphType;
 
 typedef std::pair<float, float> FloatPair;
 
-std::string input_file_name = "butterfly.jpg";
-const std::string window_name = "(1) : image (2) : result (3) : toggle / hidde mesh (+), (-) : adjust size of mesh (4)(5)(6) : other images";
+std::string input_file_name = "lotus.jpg";
+const std::string window_name = "(1) : image (2) : patche-based (3) : focus (`) : toggle / hidde mesh (+), (-) : adjust size of mesh (4)(5)(6) : other images";
 
 int target_image_width, target_image_height;
 
@@ -52,7 +52,8 @@ void DrawImage();
 
 enum ProgramMode {
   VIEWING_IMAGE,
-  VIEWING_QUAD_MESH,
+  PATCH_BASED_WARPING,
+  FOCUS_WARPING,
   VIEWING_TRIANGLE_MESH
 };
 
@@ -65,6 +66,7 @@ const int MIN_MESH_SIZE = 10;
 const int MAX_MESH_SIZE = 120;
 const int MESH_SIZE_GAP = 10;
 int current_mesh_size = 70;
+double focus_mesh_scale = 3.5;
 double focus_x;
 double focus_y;
 
@@ -109,12 +111,6 @@ int main(int argc, char **argv) {
   }
 
   Initial();
-
-  //printf("Please input target image width : ");
-  //scanf("%d", &target_image_width);
-  //printf("Please input target image height : ");
-  //scanf("%d", &target_image_height);
-  //printf("Warping image from (%d x %d) to (%d x %d)\n", image.size().width, image.size().height, target_image_width, target_image_height);
 
   target_image_width = image.size().width;
   target_image_height = image.size().height;
@@ -444,7 +440,8 @@ void RenderGL() {
   case VIEWING_IMAGE:
     DrawImage();
     break;
-  case VIEWING_QUAD_MESH:
+  case PATCH_BASED_WARPING:
+  case FOCUS_WARPING:
     DrawPolygonMesh(quad_mesh_list, quad_mesh_vertex_list);
     break;
   case VIEWING_TRIANGLE_MESH:
@@ -457,21 +454,25 @@ void RenderGL() {
 
 void Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
   if (action == GLFW_PRESS) {
-    if (key == GLFW_KEY_1 || key == GLFW_KEY_2) {
+    if (key == GLFW_KEY_1 || key == GLFW_KEY_2 || key == GLFW_KEY_3) {
       cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
       cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
       ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
     }
     switch (key) {
+    case GLFW_KEY_GRAVE_ACCENT:
+      is_viewing_mesh = !is_viewing_mesh;
+      break;
     case GLFW_KEY_1: 
       program_mode = VIEWING_IMAGE;
       break;
     case GLFW_KEY_2: 
-      program_mode = VIEWING_QUAD_MESH;
+      program_mode = PATCH_BASED_WARPING;
       selected_quad_mesh_vertex_index = -1;
       break;
-    case GLFW_KEY_3: 
-      is_viewing_mesh = !is_viewing_mesh;
+    case GLFW_KEY_3:
+      program_mode = FOCUS_WARPING;
+      selected_quad_mesh_vertex_index = -1;
       break;
     case GLFW_KEY_4:
       program_mode = VIEWING_IMAGE;
@@ -505,13 +506,13 @@ void Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
       PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
       break;
     case GLFW_KEY_KP_ADD: 
-      if (program_mode == VIEWING_QUAD_MESH || program_mode == VIEWING_TRIANGLE_MESH) {
+      if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING || program_mode == VIEWING_TRIANGLE_MESH) {
         current_mesh_size += MESH_SIZE_GAP;
         ReBuildMesh();
       }
       break;
     case GLFW_KEY_KP_SUBTRACT:
-      if (program_mode == VIEWING_QUAD_MESH || program_mode == VIEWING_TRIANGLE_MESH) {
+      if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING || program_mode == VIEWING_TRIANGLE_MESH) {
         current_mesh_size -= MESH_SIZE_GAP;
         ReBuildMesh();
       }
@@ -533,7 +534,7 @@ void Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
       break;
     }
 
-    if (program_mode == VIEWING_QUAD_MESH) {
+    if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING) {
       Reshape(window, target_image_width, target_image_height);
     } else {
       Reshape(window, image.size().width, image.size().height);
@@ -556,7 +557,7 @@ void Reshape(GLFWwindow *window, int w, int h) {
   glLoadIdentity();
 
   char screen_size_str[20] = {};
-  if (program_mode == VIEWING_QUAD_MESH) {
+  if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING) {
     target_image_width = w;
     target_image_height = h;
   } else {
@@ -577,7 +578,7 @@ void Mouse(GLFWwindow *window, int button, int action, int mods) {
 
       //FloatPair target(world_x, world_y);
       //float nearest_distance;
-      //if (program_mode == VIEWING_QUAD_MESH) {
+      //if (program_mode == PATCH_BASED_WARPING) {
       //  selected_quad_mesh_vertex_index = GetMouseNearestVertexIndex(quad_mesh_vertex_list, target, nearest_distance);
       //  if (nearest_distance > MESH_POINT_SIZE * 10) {
       //    selected_quad_mesh_vertex_index = -1;
@@ -593,7 +594,7 @@ void Mouse(GLFWwindow *window, int button, int action, int mods) {
 }
 
 void Motion(GLFWwindow *window, double x, double y) {
-  if (image.size().width == target_image_width && image.size().height == target_image_height) {
+  if (program_mode == FOCUS_WARPING) {
     double new_focus_x = x;
     double new_focus_y = image.size().height - y;
     if (std::abs(new_focus_x - focus_x) >= 1e-3 || std::abs(new_focus_y - focus_y) >= 1e-3) {
@@ -603,7 +604,7 @@ void Motion(GLFWwindow *window, double x, double y) {
     focus_y = new_focus_y;
   }
 
-  //if (program_mode == VIEWING_QUAD_MESH) {
+  //if (program_mode == PATCH_BASED_WARPING) {
   //  if (selected_quad_mesh_vertex_index != -1) {
   //    quad_mesh_vertex_list[selected_quad_mesh_vertex_index].first = x;
   //    quad_mesh_vertex_list[selected_quad_mesh_vertex_index].second = y;
@@ -617,7 +618,11 @@ void Motion(GLFWwindow *window, double x, double y) {
 }
 
 void Scroll(GLFWwindow *window, double x_offset, double y_offset) {
-  eye_z_offset -= y_offset * EYE_TRANSLATION_OFFSET_GAP;
+  if (program_mode == FOCUS_WARPING) {
+    focus_mesh_scale -= y_offset * 0.25;
+  } else {
+    eye_z_offset -= y_offset * EYE_TRANSLATION_OFFSET_GAP;
+  }
 }
 
 void ChangeGLTexture(void *texture_pointer, int width, int height) {
@@ -753,14 +758,15 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
   BuildQuadMeshWithGraph(image_graph, mesh_width, mesh_height);
   puts("Done : Build mesh and graph");
 
-  if (target_image_width == image.size().width && target_image_height == image.size().height) {
-    puts("Start : Image warping");
-    FocusWarping(image, image_graph, saliency_map, mesh_width, mesh_height, focus_x, focus_y);
-    puts("Done : Image warping");
-  } else {
-    puts("Start : Image warping");
+  if (program_mode == PATCH_BASED_WARPING) {
+    puts("Start : Patch based warping");
     PatchBasedWarping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height);
-    puts("Done : Image warping");
+    puts("Done : Patch based warping");
+    printf("New image size : %d %d\n", target_image_width, target_image_height);
+  } else if (program_mode == FOCUS_WARPING) {
+    puts("Start : Focus warping");
+    FocusWarping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height, focus_mesh_scale, focus_x, focus_y);
+    puts("Done : Focus warping");
     printf("New image size : %d %d\n", target_image_width, target_image_height);
   }
 
@@ -775,7 +781,6 @@ void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_wid
     quad_mesh_vertex_list[vertex_index].second = image_graph.V[vertex_index].second;
   }
 
-  program_mode = VIEWING_QUAD_MESH;
   selected_quad_mesh_vertex_index = -1;
   Reshape(window, target_image_width, target_image_height);
 

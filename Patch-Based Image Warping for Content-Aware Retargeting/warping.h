@@ -44,13 +44,13 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
     x.add(IloNumVar(env, -IloInfinity, IloInfinity));
   }
 
-  // Patch transformation constraint
   const double DST_WEIGHT = 0.8;
   const double DLT_WEIGHT = 0.2;
   const double ORIENTATION_WEIGHT = 10.0;
   double width_ratio = target_image_width / (double)image.size().width;
   double height_ratio = target_image_height / (double)image.size().height;
 
+  // Patch transformation constraint
   for (size_t patch_index = 0; patch_index < edge_index_list_of_patch.size(); ++patch_index) {
     std::vector<int> &edge_index_list = edge_index_list_of_patch[patch_index];
 
@@ -120,6 +120,7 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
       expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2);
     }
   }
+
   IloModel model(env);
 
   model.add(IloMinimize(env, expr));
@@ -186,7 +187,7 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
   env.end();
 }
 
-void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<double> > &saliency_map, const double mesh_width, const double mesh_height, const double focus_x, const double focus_y) {
+void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<double> &saliency_of_patch, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height, const double max_mesh_scale, const double focus_x, const double focus_y) {
   IloEnv env;
 
   IloNumVarArray x(env);
@@ -200,7 +201,6 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   int mesh_column_count = (int)(image.size().width / mesh_width) + 1;
   int mesh_row_count = (int)(image.size().height / mesh_height) + 1;
 
-  const double MESH_SCALE_SIZE = 3.5;
   const double FOCUS_WEIGHT = 5.0;
   const double ORIENTATION_WEIGHT = 10.0;
   const double DISTORTION_WEIGHT = 5.0;
@@ -211,8 +211,6 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
     float delta_x = G.V[vertex_index_1].first - G.V[vertex_index_2].first;
     float delta_y = G.V[vertex_index_1].second - G.V[vertex_index_2].second;
 
-    //double saliency_value = (saliency_map[G.V[vertex_index_1].second][G.V[vertex_index_1].first] + saliency_map[G.V[vertex_index_2].second][G.V[vertex_index_2].first]) * 0.5;
-
     double distance_to_focus_point = 0;
     distance_to_focus_point += pow((G.V[vertex_index_1].first + G.V[vertex_index_2].first) / 2.0 - focus_x, 2.0);
     distance_to_focus_point += pow((G.V[vertex_index_1].second + G.V[vertex_index_2].second) / 2.0 - focus_y, 2.0);
@@ -221,13 +219,13 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
     // Normalize distance value to [0, 1]
     distance_to_focus_point /= sqrt(std::max(pow(focus_x, 2.0), pow(image.size().width - focus_x, 2.0)) + std::max(pow(focus_y, 2.0), pow(image.size().height - focus_y, 2.0)));
 
-    distance_to_focus_point = 1 - distance_to_focus_point;
-    distance_to_focus_point = pow(distance_to_focus_point, 4.0);
+    double distance_weight = 1 - distance_to_focus_point;
+    distance_weight = pow(distance_weight, 4.0);
 
     if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
-      expr += FOCUS_WEIGHT * distance_to_focus_point * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - MESH_SCALE_SIZE * delta_x, 2);
+      expr += FOCUS_WEIGHT * distance_weight * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - max_mesh_scale * delta_x, 2);
     } else {
-      expr += FOCUS_WEIGHT * distance_to_focus_point * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - MESH_SCALE_SIZE * delta_y, 2);
+      expr += FOCUS_WEIGHT * distance_weight * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - max_mesh_scale * delta_y, 2);
     }
   }
 
@@ -259,7 +257,7 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
     c.add(x[vertex_index * 2] == G.V[0].first);
 
     vertex_index = row * mesh_column_count + mesh_column_count - 1;
-    c.add(x[vertex_index * 2] == image.size().width);
+    c.add(x[vertex_index * 2] == target_image_width);
   }
 
   for (int column = 0; column < mesh_column_count; ++column) {
@@ -267,7 +265,7 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
     c.add(x[vertex_index * 2 + 1] == G.V[0].second);
 
     vertex_index = (mesh_row_count - 1) * mesh_column_count + column;
-    c.add(x[vertex_index * 2 + 1] == image.size().height);
+    c.add(x[vertex_index * 2 + 1] == target_image_height);
   }
 
   // Avoid flipping
