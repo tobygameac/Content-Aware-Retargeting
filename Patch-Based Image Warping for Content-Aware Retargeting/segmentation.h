@@ -56,28 +56,28 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
 
   DisjointSet vertex_disjoint_set(G.V.size());
 
-  std::vector<double> threshold(G.V.size());
-  for (auto it = threshold.begin(); it != threshold.end(); ++it) {
-    *it = 1 / k;
+  std::vector<double> thresholds(G.V.size());
+  for (auto &threshold : thresholds) {
+    threshold = 1 / k;
   }
 
   // Segmentation
-  for (auto it = G.E.begin(); it != G.E.end(); ++it) {
-    int group_of_x = vertex_disjoint_set.FindGroup(it->e.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(it->e.second);
+  for (const auto &edge : G.E) {
+    int group_of_x = vertex_disjoint_set.FindGroup(edge.e.first);
+    int group_of_y = vertex_disjoint_set.FindGroup(edge.e.second);
     if (group_of_x == group_of_y) {
       continue;
     }
-    if (it->w <= std::min(threshold[group_of_x], threshold[group_of_y])) {
+    if (edge.w <= std::min(thresholds[group_of_x], thresholds[group_of_y])) {
       vertex_disjoint_set.UnionGroup(group_of_x, group_of_y);
-      threshold[group_of_x] = it->w + (k / vertex_disjoint_set.SizeOfGroup(it->e.first));
+      thresholds[group_of_x] = edge.w + (k / vertex_disjoint_set.SizeOfGroup(edge.e.first));
     }
   }
 
   // Deal with the smaller set
-  for (auto it = G.E.begin(); it != G.E.end(); ++it) {
-    int group_of_x = vertex_disjoint_set.FindGroup(it->e.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(it->e.second);
+  for (const auto &edge : G.E) {
+    int group_of_x = vertex_disjoint_set.FindGroup(edge.e.first);
+    int group_of_y = vertex_disjoint_set.FindGroup(edge.e.second);
     if (group_of_x == group_of_y) {
       continue;
     }
@@ -102,9 +102,9 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
   }
 
   // Deal with the similar color set
-  for (auto it = G.E.begin(); it != G.E.end(); ++it) {
-    int group_of_x = vertex_disjoint_set.FindGroup(it->e.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(it->e.second);
+  for (const auto &edge : G.E) {
+    int group_of_x = vertex_disjoint_set.FindGroup(edge.e.first);
+    int group_of_y = vertex_disjoint_set.FindGroup(edge.e.second);
     if (group_of_x == group_of_y) {
       continue;
     }
@@ -119,9 +119,9 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
   }
 
   // Calculate the color of each group again
-  for (auto it = group_color.begin(); it != group_color.end(); ++it) {
+  for (auto &color : group_color) {
     for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
-      it->val[pixel_index] = 0;
+      color.val[pixel_index] = 0;
     }
   }
 

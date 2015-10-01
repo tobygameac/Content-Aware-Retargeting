@@ -183,6 +183,7 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
     G.V[vertex_index].second = result[vertex_index * 2 + 1];
   }
 
+  model.end();
   cplex.end();
   env.end();
 }
@@ -300,11 +301,11 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   cplex.getValues(result, x);
 
   for (size_t vertex_index = 0; vertex_index < G.V.size(); ++vertex_index) {
-    //printf("(%.0f, %.0f) -> (%.0f, %.0f)\n", G.V[vertex_index].first , G.V[vertex_index].second, result[vertex_index * 2], result[vertex_index * 2 + 1]);
     G.V[vertex_index].first = result[vertex_index * 2];
     G.V[vertex_index].second = result[vertex_index * 2 + 1];
   }
 
+  model.end();
   cplex.end();
   env.end();
 }
