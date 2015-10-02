@@ -12,8 +12,7 @@
 typedef Graph2D<float> GraphType;
 
 void BuildGraphFromImage(const cv::Mat &image, GraphType &G) {
-  G.V.clear();
-  G.E.clear();
+  G = GraphType();
 
   G.V.reserve(image.size().width * image.size().height);
   G.E.reserve(image.size().width * image.size().height * 4);

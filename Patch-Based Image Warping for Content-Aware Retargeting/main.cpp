@@ -12,9 +12,7 @@ int main(int argc, char **argv) {
 
   Application application(input_file_name);
 
-  application.Initial();
   application.Run();
-  application.Exit();
 
   return 0;
 }

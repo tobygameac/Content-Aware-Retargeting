@@ -5,7 +5,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <iostream>
+#include <cstdio>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -18,16 +18,15 @@ cv::Mat CalculateContextAwareSaliencyMapWithMatlabProgram(const cv::Mat &image, 
   run_saliency_program_command += output_image_name;
 
   if (std::fstream(output_image_name).good()) {
-    std::cout << "The saliency image was already generated.\n";
+    puts("The saliency image was already generated.");
   } else {
-    std::cout << run_saliency_program_command + "\n";
+    puts(run_saliency_program_command.c_str());
     system(run_saliency_program_command.c_str());
   }
 
   cv::Mat saliency_image = cv::imread(output_image_name);
   cv::resize(saliency_image, saliency_image, image.size());
 
-  saliency_map.clear();
   saliency_map = std::vector<std::vector<double> >(image.size().height, std::vector<double>(image.size().width));
 
   for (int r = 0; r < image.size().height; ++r) {

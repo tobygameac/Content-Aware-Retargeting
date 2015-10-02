@@ -9,11 +9,13 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <cmath>
 #include <functional>
+#include <fstream>
 #include <vector>
 
 #include "polygon_mesh.h"
@@ -41,7 +43,6 @@ public:
 
     input_file_name(input_file_name),
 
-
     current_mesh_size(70),
     focus_mesh_scale(3.5),
 
@@ -50,14 +51,14 @@ public:
 
     data_for_warping_were_generated(false),
 
+    is_recording_screen(false),
+
     eye_x_offset(0),
     eye_y_offset(0),
     eye_z_offset(0) {
   }
 
-  void Initial();
   void Run();
-  void Exit();
 
 private:
 
@@ -67,12 +68,14 @@ private:
   void Motion(GLFWwindow *window, double x, double y);
   void Scroll(GLFWwindow *window, double x_offset, double y_offset);
 
-  void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height);
-  void SaveScreen(const std::string &filename);
-
   void RenderGL();
-
+  void ChangeGLTexture(const cv::Mat &cv_image);
   void ChangeGLTexture(void *texture_pointer, int width, int height);
+  void SaveScreen(const std::string &filename);
+  void RecordScreen(const std::string &filename, const int fps);
+
+  void PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height);
+  cv::Vec3b SaliencyValueToSignifanceColor(double saliency_value);
 
   int GetMouseNearestVertexIndex(const std::vector<FloatPair> &vertex_list, const FloatPair &target, float &nearest_distance);
 
@@ -81,6 +84,10 @@ private:
   void ReBuildMesh();
   void DrawPolygonMesh(const std::vector<PolygonMesh<float> > &mesh_list, const std::vector<FloatPair> &vertex_list);
   void DrawImage();
+
+  void ReadImage(const std::string &filename);
+  void Initial();
+  void Exit();
 
   enum ProgramMode {
     VIEWING_IMAGE,
@@ -94,7 +101,8 @@ private:
   std::string input_file_name;
   const std::string window_name;
 
-  int target_image_width, target_image_height;
+  int target_image_width;
+  int target_image_height;
 
   const float MESH_LINE_WIDTH;
   const float MESH_POINT_SIZE;
@@ -133,7 +141,9 @@ private:
   std::vector<double> saliency_of_mesh_vertex;
 
   bool data_for_warping_were_generated;
+  bool is_recording_screen;
 
+  std::vector<cv::Mat> recorded_images;
   GLFWwindow *window;
 
   float eye_x_offset;
@@ -141,12 +151,10 @@ private:
   float eye_z_offset;
 
   const float EYE_TRANSLATION_OFFSET_GAP;
-
 };
 
 void Application::BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double mesh_height) {
-  G.V.clear();
-  G.E.clear();
+  G = GraphType();
 
   int mesh_column_count = (int)(image.size().width / mesh_width) + 1;
   int mesh_row_count = (int)(image.size().height / mesh_height) + 1;
@@ -342,13 +350,9 @@ void Application::DrawPolygonMesh(const std::vector<PolygonMesh<float> > &mesh_l
       glBegin(GL_LINE_STRIP);
 
       double vertex_saliency = saliency_of_mesh_vertex[mesh.vertex_index[0]];
-      if (vertex_saliency < (1 / 3.0)) {
-        glColor3f(0, vertex_saliency * 3.0, 1 - vertex_saliency * 3.0);
-      } else if (vertex_saliency < (2 / 3.0)) {
-        glColor3f((vertex_saliency - (1 / 3.0)) * 3.0, 1.0, 0);
-      } else {
-        glColor3f(1.0, 1.0 - (vertex_saliency - (2 / 3.0)) * 3.0, 0);
-      }
+      cv::Vec3b siginfance_color = SaliencyValueToSignifanceColor(vertex_saliency);
+      glColor3f(siginfance_color[2] / 255.0, siginfance_color[1] / 255.0, siginfance_color[0] / 255.0);
+
       for (int j = 0; j < vertex_count + 1; ++j) {
         int vertex_index = mesh.vertex_index[j % vertex_count];
         glVertex3f(vertex_list[vertex_index].first, vertex_list[vertex_index].second, 0);
@@ -381,8 +385,6 @@ void Application::DrawPolygonMesh(const std::vector<PolygonMesh<float> > &mesh_l
 
     glBegin(GL_POLYGON);
 
-    glNormal3f(0, 0, 1);
-
     for (int j = 0; j < vertex_count; ++j) {
       FloatPair texture_coordinate = mesh.texture_coordinate[j];
       glTexCoord2f(texture_coordinate.first, texture_coordinate.second);
@@ -409,7 +411,6 @@ void Application::DrawImage() {
   vertex_list.push_back(FloatPair(image.size().width, 0.0));
 
   glBegin(GL_POLYGON);
-  glNormal3f(0, 0, 1);
   for (const auto &vertex : vertex_list) {
     glTexCoord2f(vertex.first / image.size().width, vertex.second / image.size().height);
     glVertex3f(vertex.first, vertex.second, 0);
@@ -474,12 +475,19 @@ void Application::RenderGL() {
 
 void Application::Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
   if (action == GLFW_PRESS) {
+
     if (key == GLFW_KEY_1 || key == GLFW_KEY_2 || key == GLFW_KEY_3) {
-      cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
-      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+      ChangeGLTexture(image);
     }
     switch (key) {
+    case GLFW_KEY_F1:
+      printf("Input image file name : ");
+      char buffer[1 << 10];
+      scanf("%s", buffer);
+      input_file_name = std::string(buffer);
+      ReadImage(input_file_name);
+      PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
+      break;
     case GLFW_KEY_GRAVE_ACCENT:
       is_viewing_mesh = !is_viewing_mesh;
       break;
@@ -496,21 +504,15 @@ void Application::Keyboard(GLFWwindow *window, int key, int scancode, int action
       break;
     case GLFW_KEY_4:
       program_mode = VIEWING_IMAGE;
-      cv::cvtColor(image_after_segmentation, image_for_gl_texture, CV_BGR2RGB);
-      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+      ChangeGLTexture(image_after_segmentation);
       break;
     case GLFW_KEY_5:
       program_mode = VIEWING_IMAGE;
-      cv::cvtColor(saliency_image, image_for_gl_texture, CV_BGR2RGB);
-      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+      ChangeGLTexture(saliency_image);
       break;
     case GLFW_KEY_6:
       program_mode = VIEWING_IMAGE;
-      cv::cvtColor(significance_image, image_for_gl_texture, CV_BGR2RGB);
-      cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-      ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+      ChangeGLTexture(significance_image);
       break;
     case GLFW_KEY_7: 
       program_mode = VIEWING_TRIANGLE_MESH;
@@ -521,6 +523,14 @@ void Application::Keyboard(GLFWwindow *window, int key, int scancode, int action
       break;
     case GLFW_KEY_P:
       SaveScreen("warping_" + input_file_name);
+      break;
+    case GLFW_KEY_R:
+      if (!is_recording_screen) {
+        recorded_images.clear();
+      } else {
+        RecordScreen("warping.avi", 30);
+      }
+      is_recording_screen = !is_recording_screen;
       break;
     case GLFW_KEY_W:
       PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
@@ -589,7 +599,7 @@ void Application::Reshape(GLFWwindow *window, int w, int h) {
   glfwSetWindowTitle(window, (std::string(screen_size_str) + window_name).c_str());
 }
 
-void Application::Mouse(GLFWwindow *window, int button, int action, int mods) {
+;void Application::Mouse(GLFWwindow *window, int button, int action, int mods) {
   if (action == GLFW_PRESS) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
       //float world_x = x;
@@ -616,7 +626,7 @@ void Application::Motion(GLFWwindow *window, double x, double y) {
   if (program_mode == FOCUS_WARPING) {
     double new_focus_x = x;
     double new_focus_y = image.size().height - y;
-    if (std::abs(new_focus_x - focus_x) >= 1e-3 || std::abs(new_focus_y - focus_y) >= 1e-3) {
+    if (std::abs(new_focus_x - focus_x) >= 1 || std::abs(new_focus_y - focus_y) >= 1) {
       PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
     }
     focus_x = new_focus_x;
@@ -642,6 +652,12 @@ void Application::Scroll(GLFWwindow *window, double x_offset, double y_offset) {
   } else {
     eye_z_offset -= y_offset * EYE_TRANSLATION_OFFSET_GAP;
   }
+}
+
+void Application::ChangeGLTexture(const cv::Mat &cv_image) {
+  cv::cvtColor(cv_image, image_for_gl_texture, CV_BGR2RGB);
+  cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
+  ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
 }
 
 void Application::ChangeGLTexture(void *texture_pointer, int width, int height) {
@@ -685,7 +701,6 @@ void Application::PatchBasedImageWarpingForContentAwareRetargeting(const int tar
     saliency_map.push_back(saliency_map.back());
     group_of_pixel.push_back(group_of_pixel.back());
 
-    saliency_of_patch.clear();
     saliency_of_patch = std::vector<double>((image.size().width + 1) * (image.size().height + 1));
     std::vector<int> group_count((image.size().width + 1) * (image.size().height + 1));
     for (int r = 0; r < image.size().height + 1; ++r) {
@@ -713,16 +728,7 @@ void Application::PatchBasedImageWarpingForContentAwareRetargeting(const int tar
     for (int r = 0; r < image.size().height; ++r) {
       for (int c = 0; c < image.size().width; ++c) {
         double vertex_saliency = saliency_of_patch[group_of_pixel[r][c]];
-        if (vertex_saliency < (1 / 3.0)) {
-          significance_image.at<cv::Vec3b>(r, c).val[1] = (vertex_saliency * 3.0) * 255;
-          significance_image.at<cv::Vec3b>(r, c).val[0] = (1 - vertex_saliency * 3.0) * 255;
-        } else if (vertex_saliency < (2 / 3.0)) {
-          significance_image.at<cv::Vec3b>(r, c).val[2] = ((vertex_saliency - (1 / 3.0)) * 3.0) * 255;
-          significance_image.at<cv::Vec3b>(r, c).val[1] = 1.0 * 255;
-        } else {
-          significance_image.at<cv::Vec3b>(r, c).val[2] = 1.0 * 255;
-          significance_image.at<cv::Vec3b>(r, c).val[1] = (1.0 - (vertex_saliency - (2 / 3.0)) * 3.0) * 255;
-        }
+        significance_image.at<cv::Vec3b>(r, c) = SaliencyValueToSignifanceColor(vertex_saliency);
       }
     }
     cv::imwrite("significance_" + input_file_name, significance_image);
@@ -766,15 +772,52 @@ void Application::PatchBasedImageWarpingForContentAwareRetargeting(const int tar
   eye_z_offset = cotanget_of_half_of_fovy * (target_image_height / 2.0);
 }
 
+cv::Vec3b Application::SaliencyValueToSignifanceColor(double saliency_value) {
+  cv::Vec3b signifance_color(0, 0, 0);
+
+  if (saliency_value > 1) {
+    signifance_color[2] = 1;
+  }
+
+  if (saliency_value < 0) {
+    signifance_color[0] = 1;
+  }
+
+  if (saliency_value < (1 / 3.0)) {
+    signifance_color[1] = (saliency_value * 3.0) * 255;
+    signifance_color[0] = (1 - saliency_value * 3.0) * 255;
+  } else if (saliency_value < (2 / 3.0)) {
+    signifance_color[2] = ((saliency_value - (1 / 3.0)) * 3.0) * 255;
+    signifance_color[1] = 1.0 * 255;
+  } else if (saliency_value <= 1) {
+    signifance_color[2] = 1.0 * 255;
+    signifance_color[1] = (1.0 - (saliency_value - (2 / 3.0)) * 3.0) * 255;
+  }
+
+  return signifance_color;
+}
+
 void Application::SaveScreen(const std::string &filename) {
-  printf("Screen saved : %s\n", filename);
-  unsigned char *image_after_warping_data = new unsigned char[3 * target_image_width * target_image_height];
-  glReadPixels(0, 0, target_image_width, target_image_height, GL_RGB, GL_UNSIGNED_BYTE, image_after_warping_data);
-  cv::Mat image_after_warping(target_image_height, target_image_width, image.type(), image_after_warping_data);
-  cv::cvtColor(image_after_warping, image_after_warping, CV_BGR2RGB);
-  cv::flip(image_after_warping, image_after_warping, 0);
-  cv::imwrite(filename, image_after_warping);
-  delete []image_after_warping_data;
+  unsigned char *screen_image_data = new unsigned char[3 * target_image_width * target_image_height];
+  glReadPixels(0, 0, target_image_width, target_image_height, GL_RGB, GL_UNSIGNED_BYTE, screen_image_data);
+  cv::Mat screen_image(target_image_height, target_image_width, image.type(), screen_image_data);
+  cv::cvtColor(screen_image, screen_image, CV_BGR2RGB);
+  cv::flip(screen_image, screen_image, 0);
+  cv::imwrite(filename, screen_image);
+  delete []screen_image_data;
+  printf("Screen saved : %s\n", filename.c_str());
+}
+
+void Application::RecordScreen(const std::string &filename, const int fps) {
+  if (!recorded_images.size()) {
+    return;
+  }
+  cv::VideoWriter cv_video_writer;
+  cv_video_writer.open(filename.c_str(), CV_FOURCC('M', 'J', 'P', 'G'), fps, recorded_images[0].size(), true);
+  for (const auto &screen_image : recorded_images) {
+    cv_video_writer.write(screen_image);
+  }
+  printf("Video saved : %s\n", filename.c_str());
 }
 
 void Application::Initial() {
@@ -782,12 +825,8 @@ void Application::Initial() {
     exit(EXIT_FAILURE);
   }
 
-  printf("Start : Read image %s\n", input_file_name.c_str());
-  image = cv::imread(input_file_name);
-  printf("Input image(%s) size : (%d x %d)\n", input_file_name.c_str(), image.size().width, image.size().height);
-  printf("Done : Read image %s\n", input_file_name.c_str());
+  window = glfwCreateWindow(1, 1, window_name.c_str(), NULL, NULL);
 
-  window = glfwCreateWindow(image.size().width, image.size().height, window_name.c_str(), NULL, NULL);
   if (!window) {
     glfwTerminate();
     exit(EXIT_FAILURE);
@@ -795,8 +834,6 @@ void Application::Initial() {
 
   glewExperimental = GL_TRUE;
   glewInit();
-
-  BuildTriangleMesh();
 
   glfwSetWindowUserPointer(window, this);
 
@@ -830,30 +867,59 @@ void Application::Initial() {
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);
 
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+}
+
+void Application::ReadImage(const std::string &filename) {
+  if (!std::fstream(filename).good()) {
+    printf("image %s not found.\n", filename.c_str());
+    return;
+  }
+  printf("Start : Read image %s\n", filename.c_str());
+  image = cv::imread(filename);
+  printf("Input image(%s) size : (%d x %d)\n", filename.c_str(), image.size().width, image.size().height);
+  printf("Done : Read image %s\n", filename.c_str());
+
+  Reshape(window, image.size().width, image.size().height);
+
   double cotanget_of_half_of_fovy = 1.0 / tan(22.5 * acos(-1.0) / 180.0);
   eye_z_offset = cotanget_of_half_of_fovy * (image.size().height / 2.0);
 
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-  cv::cvtColor(image, image_for_gl_texture, CV_BGR2RGB);
-  cv::flip(image_for_gl_texture, image_for_gl_texture, 0);
-  ChangeGLTexture(image_for_gl_texture.data, image.size().width, image.size().height);
+  ChangeGLTexture(image);
 
   focus_x = image.size().width / 2.0;
   focus_y = image.size().height / 2.0;
 
+  BuildTriangleMesh();
+
   program_mode = VIEWING_IMAGE;
+
+  target_image_width = image.size().width;
+  target_image_height = image.size().height;
+
+  data_for_warping_were_generated = false;
 }
 
 void Application::Run() {
-  target_image_width = image.size().width;
-  target_image_height = image.size().height;
+  Initial();
+
+  ReadImage(input_file_name);
+
   PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
 
   while (!glfwWindowShouldClose(window)) {
     RenderGL();
-    glfwPollEvents();
+    if (is_recording_screen) {
+      glfwPollEvents();
+      const std::string temp_frame_image_name = "warping_" + input_file_name;
+      SaveScreen(temp_frame_image_name);
+      recorded_images.push_back(cv::imread(temp_frame_image_name));
+    } else {
+      glfwWaitEvents();
+    }
   }
+
+  Exit();
 }
 
 void Application::Exit() {

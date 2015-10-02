@@ -16,7 +16,7 @@ typedef Graph2D<float> GraphType;
 void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<double> &saliency_of_patch, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
   if (target_image_width <= 0 || target_image_height <= 0) {
     printf("Wrong target image size (%d x %d)\n", target_image_width, target_image_height);
-    exit(-1);
+    return;
   }
 
   // Build the edge list of each patch
@@ -47,6 +47,7 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
   const double DST_WEIGHT = 0.8;
   const double DLT_WEIGHT = 0.2;
   const double ORIENTATION_WEIGHT = 10.0;
+
   double width_ratio = target_image_width / (double)image.size().width;
   double height_ratio = target_image_height / (double)image.size().height;
 
@@ -70,7 +71,7 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
     double matrix_rank = original_matrix_a * original_matrix_d - original_matrix_b * original_matrix_c;
 
     if (fabs(matrix_rank) <= 1e-9) {
-      matrix_rank = 1e-9;
+      matrix_rank = (matrix_rank > 0 ? 1 : -1) * 1e-9;
     }
 
     double matrix_a = original_matrix_d / matrix_rank;
@@ -78,8 +79,8 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
     double matrix_c = -original_matrix_c / matrix_rank;
     double matrix_d = original_matrix_a / matrix_rank;
 
-    for (size_t edge_index = 0; edge_index < edge_index_list.size(); ++edge_index) {
-      Edge edge = G.E[edge_index_list[edge_index]];
+    for (const auto &edge_index : edge_index_list) {
+      Edge edge = G.E[edge_index];
       double e_x = G.V[edge.e.first].first - G.V[edge.e.second].first;
       double e_y = G.V[edge.e.first].second - G.V[edge.e.second].second;
 
@@ -109,12 +110,12 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
   }
 
   // Grid orientation constraint
-  for (size_t edge_index = 0; edge_index < G.E.size(); ++edge_index) {
-    int vertex_index_1 = G.E[edge_index].e.first;
-    int vertex_index_2 = G.E[edge_index].e.second;
-    float delta_x = abs(G.V[vertex_index_1].first - G.V[vertex_index_2].first);
-    float delta_y = abs(G.V[vertex_index_1].second - G.V[vertex_index_2].second);
-    if (delta_x > delta_y) { // Horizontal
+  for (const auto &edge : G.E) {
+    int vertex_index_1 = edge.e.first;
+    int vertex_index_2 = edge.e.second;
+    float delta_x = G.V[vertex_index_1].first - G.V[vertex_index_2].first;
+    float delta_y = G.V[vertex_index_1].second - G.V[vertex_index_2].second;
+    if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
       expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1], 2);
     } else {
       expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2);
@@ -189,6 +190,11 @@ void PatchBasedWarping(const cv::Mat &image, GraphType &G, const std::vector<std
 }
 
 void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<double> &saliency_of_patch, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height, const double max_mesh_scale, const double focus_x, const double focus_y) {
+  if (target_image_width <= 0 || target_image_height <= 0) {
+    printf("Wrong target image size (%d x %d)\n", target_image_width, target_image_height);
+    return;
+  }
+
   IloEnv env;
 
   IloNumVarArray x(env);
@@ -231,9 +237,9 @@ void FocusWarping(const cv::Mat &image, GraphType &G, const std::vector<std::vec
   }
 
   // Grid orientation & distortion constraint
-  for (size_t edge_index = 0; edge_index < G.E.size(); ++edge_index) {
-    int vertex_index_1 = G.E[edge_index].e.first;
-    int vertex_index_2 = G.E[edge_index].e.second;
+  for (const auto &edge : G.E) {
+    int vertex_index_1 = edge.e.first;
+    int vertex_index_2 = edge.e.second;
     float delta_x = G.V[vertex_index_1].first - G.V[vertex_index_2].first;
     float delta_y = G.V[vertex_index_1].second - G.V[vertex_index_2].second;
     if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
