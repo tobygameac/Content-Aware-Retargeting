@@ -1,31 +1,41 @@
-#ifndef SALIENCY_H_
-#define SALIENCY_H_
+#pragma once
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv\cv.hpp>
 
-#include <cstdio>
+#include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
 
-cv::Mat CalculateContextAwareSaliencyMapWithMatlabProgram(const cv::Mat &image, std::vector<std::vector<double> > &saliency_map, const std::string &matlab_program_name, const std::string &input_image_name, const std::string &output_image_name) {
-  std::string run_saliency_program_command = matlab_program_name;
-  run_saliency_program_command += std::string(" ");
-  run_saliency_program_command += input_image_name;
-  run_saliency_program_command += std::string(" ");
-  run_saliency_program_command += output_image_name;
+const std::string SALIENCY_PROGRAM_PATH = "..\\program\\saliency\\saliency.exe";
 
-  if (std::fstream(output_image_name).good()) {
-    puts("The saliency image was already generated.");
+cv::Mat CalculateContextAwareSaliencyMapWithMatlabProgram(const cv::Mat &image, std::vector<std::vector<double> > &saliency_map, const std::string &input_image_name, const std::string &output_image_path) {
+  std::string saliency_program_command = SALIENCY_PROGRAM_PATH;
+  saliency_program_command += std::string(" ");
+  saliency_program_command += "\"" + input_image_name + "\"";
+  saliency_program_command += std::string(" ");
+  saliency_program_command += "\"" + output_image_path + "\"";
+
+  if (std::fstream(output_image_path).good()) {
+    std::cout << "The saliency image " + output_image_path + " was already generated.\n";
   } else {
-    puts(run_saliency_program_command.c_str());
-    system(run_saliency_program_command.c_str());
+    std::cout << saliency_program_command << "\n";
+    system(saliency_program_command.c_str());
   }
+  
+  //cv::Mat saliency_map_test;
+  //cv::Ptr<cv::saliency::Saliency> saliency_algorithm = cv::saliency::Saliency::create("SPECTRAL_RESIDUAL");
+  //saliency_algorithm->computeSaliency(image, saliency_map_test);
 
-  cv::Mat saliency_image = cv::imread(output_image_name);
+  //cv::Mat saliency_image_test;
+  //cv::saliency::StaticSaliencySpectralResidual spec;
+  //spec.computeSaliency(saliency_map_test, saliency_image_test);
+  //cv::imshow("Saliency Map", saliency_map_test);
+  //cv::imshow("Saliency image", saliency_image_test);
+
+  cv::Mat saliency_image = cv::imread(output_image_path);
   cv::resize(saliency_image, saliency_image, image.size());
+  cv::imwrite(output_image_path, saliency_image);
 
   saliency_map = std::vector<std::vector<double> >(image.size().height, std::vector<double>(image.size().width));
 
@@ -41,4 +51,3 @@ cv::Mat CalculateContextAwareSaliencyMapWithMatlabProgram(const cv::Mat &image, 
 
   return saliency_image;
 }
-#endif

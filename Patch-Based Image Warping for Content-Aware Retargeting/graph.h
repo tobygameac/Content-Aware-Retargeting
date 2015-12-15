@@ -1,37 +1,46 @@
-#ifndef GRAPH_H_
-#define GRAPH_H_
+#pragma once
 
+#include <utility>
 #include <vector>
 
 class Edge {
-public:
-  Edge() {}
-  Edge(std::pair<int, int> e) : e(e) {}
-  Edge(std::pair<int, int> e, double w) : e(e), w(w) {}
 
-  const bool operator <(const Edge &other) {
-    if (w != other.w) { 
-      return  w < other.w;
-    }
-    if ((e.first != other.e.first)) { 
-      return  e.first < other.e.first;
-    }
-    return e.second < other.e.second;
+public:
+
+  Edge() {
   }
 
-  std::pair<int, int> e;
-  double w;
+  Edge(std::pair<size_t, size_t> &edge_indices_pair) : edge_indices_pair_(edge_indices_pair) {
+  }
+
+  Edge(std::pair<size_t, size_t> &edge_indices_pair, double weight) : edge_indices_pair_(edge_indices_pair), weight_(weight) {
+  }
+
+  const bool operator <(const Edge &other) {
+    if (weight_ != other.weight_) {
+      return weight_ < other.weight_;
+    }
+    if ((edge_indices_pair_.first != other.edge_indices_pair_.first)) {
+      return  edge_indices_pair_.first < other.edge_indices_pair_.first;
+    }
+    return edge_indices_pair_.second < other.edge_indices_pair_.second;
+  }
+
+  std::pair<size_t, size_t> edge_indices_pair_;
+  double weight_;
 };
 
 template <class T>
-class Graph2D {
+class Graph {
+
 public:
-  Graph2D() {}
 
-  Graph2D(std::vector<std::pair<T, T> > V, std::vector<Edge> E) : V(V), E(E) {}
+  Graph() {
+  }
 
-  std::vector<std::pair<T, T> > V;
-  std::vector<Edge> E;
+  Graph(std::vector<T> &vertices, std::vector<Edge> &edges) : vertices_(vertices), edges_(edges) {
+  }
+
+  std::vector<T> vertices_;
+  std::vector<Edge> edges_;
 };
-
-#endif

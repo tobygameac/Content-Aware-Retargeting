@@ -4,8 +4,6 @@
 #include <windows.h>
 #include <wingdi.h>
 
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
@@ -18,10 +16,8 @@
 #include <fstream>
 #include <vector>
 
-#include "polygon_mesh.h"
 #include "saliency.h"
 #include "segmentation.h"
-#include "triangle.h"
 #include "warping.h"
 
 class Application {
@@ -31,31 +27,7 @@ class Application {
 public:
 
   Application(std::string input_file_name) :
-    window_name("(1) : image (2) : patche-based (3) : focus (`) : toggle / hidde mesh (+), (-) : adjust size of mesh (4)(5)(6) : other images"),
-    MESH_LINE_WIDTH(4.5),
-    MESH_POINT_SIZE(7.5),
-
-    MIN_MESH_SIZE(10),
-    MAX_MESH_SIZE(120),
-    MESH_SIZE_GAP(10),
-
-    EYE_TRANSLATION_OFFSET_GAP(25.0),
-
-    input_file_name(input_file_name),
-
-    current_mesh_size(70),
-    focus_mesh_scale(3.5),
-
-    is_viewing_mesh(true),
-    is_viewing_mesh_point(false),
-
-    data_for_warping_were_generated(false),
-
-    is_recording_screen(false),
-
-    eye_x_offset(0),
-    eye_y_offset(0),
-    eye_z_offset(0) {
+    window_name("(1) : image (2) : patche-based (3) : focus (`) : toggle / hidde mesh (+), (-) : adjust size of mesh (4)(5)(6) : other images") {
   }
 
   void Run();
@@ -140,7 +112,7 @@ private:
   std::vector<double> saliency_of_patch;
   std::vector<double> saliency_of_mesh_vertex;
 
-  bool data_for_warping_were_generated;
+  bool data_for_image_warping_were_generated;
   bool is_recording_screen;
 
   std::vector<cv::Mat> recorded_images;
@@ -167,7 +139,7 @@ void Application::BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double
   for (int r = 0; r < mesh_row_count; ++r) {
     for (int c = 0; c < mesh_column_count; ++c) {
       quad_mesh_vertex_list.push_back(FloatPair(c * real_mesh_width, r * real_mesh_height));
-      G.V.push_back(quad_mesh_vertex_list.back());
+      G.vertices_.push_back(quad_mesh_vertex_list.back());
     }
   }
 
@@ -178,19 +150,19 @@ void Application::BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double
       std::vector<int> vertex_index;
       std::vector<FloatPair> texture_coordinate;
 
-      int base_index = r * (mesh_column_count) + c;
+      int base_index = r * (mesh_column_count)+c;
       vertex_index.push_back(base_index);
       vertex_index.push_back(base_index + mesh_column_count);
       vertex_index.push_back(base_index + mesh_column_count + 1);
       vertex_index.push_back(base_index + 1);
 
       if (!c) {
-        G.E.push_back(Edge(std::pair<int, int>(vertex_index[0], vertex_index[1])));
+        G.edges_.push_back(Edge(std::pair<int, int>(vertex_index[0], vertex_index[1])));
       }
-      G.E.push_back(Edge(std::pair<int, int>(vertex_index[1], vertex_index[2])));
-      G.E.push_back(Edge(std::pair<int, int>(vertex_index[2], vertex_index[3])));
+      G.edges_.push_back(Edge(std::pair<int, int>(vertex_index[1], vertex_index[2])));
+      G.edges_.push_back(Edge(std::pair<int, int>(vertex_index[2], vertex_index[3])));
       if (!r) {
-        G.E.push_back(Edge(std::pair<int, int>(vertex_index[3], vertex_index[0])));
+        G.edges_.push_back(Edge(std::pair<int, int>(vertex_index[3], vertex_index[0])));
       }
 
       for (const auto &index : vertex_index) {
@@ -201,130 +173,6 @@ void Application::BuildQuadMeshWithGraph(GraphType &G, double mesh_width, double
       quad_mesh_list.push_back(PolygonMesh<float>(vertex_index, texture_coordinate));
     }
   }
-}
-
-void Application::BuildTriangleMesh() {
-  triangulateio in, mid, out, vorout;
-
-  in.numberofpoints = 4;
-  in.numberofpointattributes = 1;
-  in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
-  in.pointlist[0] = 0;
-  in.pointlist[1] = 0;
-
-  in.pointlist[2] = 0;
-  in.pointlist[3] = image.size().height;
-
-  in.pointlist[4] = image.size().width;
-  in.pointlist[5] = image.size().height;
-
-  in.pointlist[6] = image.size().width;
-  in.pointlist[7] = 0;
-
-  in.pointattributelist = (REAL *)malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
-  in.pointattributelist[0] = 0.0;
-  in.pointattributelist[1] = image.size().width;
-  in.pointattributelist[2] = image.size().width + image.size().height;
-  in.pointattributelist[3] = image.size().height;
-
-  in.pointmarkerlist = (int *)malloc(in.numberofpoints * sizeof(int));
-  in.pointmarkerlist[0] = 0;
-  in.pointmarkerlist[1] = 2;
-  in.pointmarkerlist[2] = 0;
-  in.pointmarkerlist[3] = 0;
-
-  in.numberofsegments = 0;
-
-  in.numberofholes = 0;
-
-  in.numberofregions = 1;
-  in.regionlist = (REAL *)malloc(in.numberofregions * 4 * sizeof(REAL));
-  in.regionlist[0] = 0.5;
-  in.regionlist[1] = 5.0;
-  in.regionlist[2] = 7.0;
-  in.regionlist[3] = 0.1;
-
-  mid.pointlist = (REAL *) NULL;            /* Not needed if -N switch used. */
-  /* Not needed if -N switch used or number of point attributes is zero: */
-  mid.pointattributelist = (REAL *) NULL;
-  mid.pointmarkerlist = (int *) NULL; /* Not needed if -N or -B switch used. */
-  mid.trianglelist = (int *) NULL;          /* Not needed if -E switch used. */
-  /* Not needed if -E switch used or number of triangle attributes is zero: */
-  mid.triangleattributelist = (REAL *) NULL;
-  mid.neighborlist = (int *) NULL;         /* Needed only if -n switch used. */
-  /* Needed only if segments are output (-p or -c) and -P not used: */
-  mid.segmentlist = (int *) NULL;
-  /* Needed only if segments are output (-p or -c) and -P and -B not used: */
-  mid.segmentmarkerlist = (int *) NULL;
-  mid.edgelist = (int *) NULL;             /* Needed only if -e switch used. */
-  mid.edgemarkerlist = (int *) NULL;   /* Needed if -e used and -B not used. */
-
-  vorout.pointlist = (REAL *) NULL;        /* Needed only if -v switch used. */
-  /* Needed only if -v switch used and number of attributes is not zero: */
-  vorout.pointattributelist = (REAL *) NULL;
-  vorout.edgelist = (int *) NULL;          /* Needed only if -v switch used. */
-  vorout.normlist = (REAL *) NULL;         /* Needed only if -v switch used. */
-
-  triangulate("pczAevn -Q", &in, &mid, &vorout);
-
-  mid.trianglearealist = (REAL *)malloc(mid.numberoftriangles * sizeof(REAL));
-  mid.trianglearealist[0] = 3.0;
-  mid.trianglearealist[1] = 1.0;
-
-  out.pointlist = (REAL *)NULL;
-  out.pointattributelist = (REAL *)NULL;
-  out.trianglelist = (int *)NULL;
-  out.triangleattributelist = (REAL *)NULL;
-
-  char triangulate_instruction[100] = "";
-  sprintf(triangulate_instruction, "pq30ra%dzBP -Q", current_mesh_size * 200);
-  triangulate(triangulate_instruction, &mid, &out, NULL);
-
-  selected_triangle_mesh_vertex_index = -1;
-
-  triangle_mesh_vertex_list.clear();
-
-  for (int i = 0; i < out.numberofpoints; ++i) {
-    triangle_mesh_vertex_list.push_back(FloatPair(out.pointlist[i * 2], out.pointlist[i * 2 + 1]));
-  }
-
-  triangle_mesh_list.clear();
-
-  for (int i = 0; i < out.numberoftriangles; ++i) {
-    std::vector<int> vertex_index;
-    std::vector<FloatPair> texture_coordinate;
-    for (int j = 0; j < out.numberofcorners; ++j) {
-      int target_vertex_index = out.trianglelist[i * out.numberofcorners + j];
-      vertex_index.push_back(target_vertex_index);
-      FloatPair mesh_vertex = triangle_mesh_vertex_list[target_vertex_index];
-      texture_coordinate.push_back(FloatPair(mesh_vertex.first / image.size().width, mesh_vertex.second / image.size().height));
-    }
-    triangle_mesh_list.push_back(PolygonMesh<float>(vertex_index, texture_coordinate));
-  }
-
-  free(in.pointlist);
-  free(in.pointattributelist);
-  free(in.pointmarkerlist);
-  free(in.regionlist);
-  free(mid.pointlist);
-  free(mid.pointattributelist);
-  free(mid.pointmarkerlist);
-  free(mid.trianglelist);
-  free(mid.triangleattributelist);
-  free(mid.trianglearealist);
-  free(mid.neighborlist);
-  free(mid.segmentlist);
-  free(mid.segmentmarkerlist);
-  free(mid.edgelist);
-  free(mid.edgemarkerlist);
-  free(vorout.pointlist);
-  free(vorout.pointattributelist);
-  free(vorout.edgelist);
-  free(vorout.normlist);
-  free(out.pointlist);
-  free(out.pointattributelist);
-  free(out.trianglelist);
-  free(out.triangleattributelist);
 }
 
 void Application::ReBuildMesh() {
@@ -436,141 +284,137 @@ int Application::GetMouseNearestVertexIndex(const std::vector<FloatPair> &vertex
 }
 
 void Application::RenderGL() {
-  glClearColor(1.0, 1.0, 1.0, 1.0);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  //glClearColor(1.0, 1.0, 1.0, 1.0);
+  //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
+  //glMatrixMode(GL_MODELVIEW);
+  //glLoadIdentity();
 
-  int window_width, window_height;
-  glfwGetWindowSize(window, &window_width, &window_height);
-  gluLookAt(window_width / 2.0 + eye_x_offset, window_height / 2.0 + eye_y_offset, 0 + eye_z_offset + 1e-6,
-    window_width / 2.0 + eye_x_offset, window_height / 2.0 + eye_y_offset, 0,
-    0, 1, 0
-    );
+  //int window_width, window_height;
+  //glfwGetWindowSize(window, &window_width, &window_height);
+  //gluLookAt(window_width / 2.0 + eye_x_offset, window_height / 2.0 + eye_y_offset, 0 + eye_z_offset + 1e-6,
+  //  window_width / 2.0 + eye_x_offset, window_height / 2.0 + eye_y_offset, 0,
+  //  0, 1, 0
+  //  );
 
   //gluLookAt(0, 0, eye_z_offset + 1e-6,
   //  0, 0, 0,
   //  0, 1, 0
   //  );
 
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glEnable(GL_BLEND);
+  //switch (program_mode) {
+  //case VIEWING_IMAGE:
+  //  DrawImage();
+  //  break;
+  //case PATCH_BASED_WARPING:
+  //case FOCUS_WARPING:
+  //  DrawPolygonMesh(quad_mesh_list, quad_mesh_vertex_list);
+  //  break;
+  //case VIEWING_TRIANGLE_MESH:
+  //  DrawPolygonMesh(triangle_mesh_list, triangle_mesh_vertex_list);
+  //  break;
+  //}
 
-  switch (program_mode) {
-  case VIEWING_IMAGE:
-    DrawImage();
-    break;
-  case PATCH_BASED_WARPING:
-  case FOCUS_WARPING:
-    DrawPolygonMesh(quad_mesh_list, quad_mesh_vertex_list);
-    break;
-  case VIEWING_TRIANGLE_MESH:
-    DrawPolygonMesh(triangle_mesh_list, triangle_mesh_vertex_list);
-    break;
-  }
-
-  glfwSwapBuffers(window);
 }
 
-void Application::Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
-  if (action == GLFW_PRESS) {
-
-    if (key == GLFW_KEY_1 || key == GLFW_KEY_2 || key == GLFW_KEY_3) {
-      ChangeGLTexture(image);
-    }
-    switch (key) {
-    case GLFW_KEY_F1:
-      printf("Input image file name : ");
-      char buffer[1 << 10];
-      scanf("%s", buffer);
-      input_file_name = std::string(buffer);
-      ReadImage(input_file_name);
-      PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
-      break;
-    case GLFW_KEY_GRAVE_ACCENT:
-      is_viewing_mesh = !is_viewing_mesh;
-      break;
-    case GLFW_KEY_1: 
-      program_mode = VIEWING_IMAGE;
-      break;
-    case GLFW_KEY_2: 
-      program_mode = PATCH_BASED_WARPING;
-      selected_quad_mesh_vertex_index = -1;
-      break;
-    case GLFW_KEY_3:
-      program_mode = FOCUS_WARPING;
-      selected_quad_mesh_vertex_index = -1;
-      break;
-    case GLFW_KEY_4:
-      program_mode = VIEWING_IMAGE;
-      ChangeGLTexture(image_after_segmentation);
-      break;
-    case GLFW_KEY_5:
-      program_mode = VIEWING_IMAGE;
-      ChangeGLTexture(saliency_image);
-      break;
-    case GLFW_KEY_6:
-      program_mode = VIEWING_IMAGE;
-      ChangeGLTexture(significance_image);
-      break;
-    case GLFW_KEY_7: 
-      program_mode = VIEWING_TRIANGLE_MESH;
-      selected_triangle_mesh_vertex_index = -1;
-      break;
-    case GLFW_KEY_0: 
-      is_viewing_mesh_point = !is_viewing_mesh_point;
-      break;
-    case GLFW_KEY_P:
-      SaveScreen("warping_" + input_file_name);
-      break;
-    case GLFW_KEY_R:
-      if (!is_recording_screen) {
-        recorded_images.clear();
-      } else {
-        RecordScreen("warping.avi", 30);
-      }
-      is_recording_screen = !is_recording_screen;
-      break;
-    case GLFW_KEY_W:
-      PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
-      break;
-    case GLFW_KEY_KP_ADD: 
-      if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING || program_mode == VIEWING_TRIANGLE_MESH) {
-        current_mesh_size += MESH_SIZE_GAP;
-        ReBuildMesh();
-      }
-      break;
-    case GLFW_KEY_KP_SUBTRACT:
-      if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING || program_mode == VIEWING_TRIANGLE_MESH) {
-        current_mesh_size -= MESH_SIZE_GAP;
-        ReBuildMesh();
-      }
-      break;
-    case GLFW_KEY_UP:
-      eye_y_offset += EYE_TRANSLATION_OFFSET_GAP;
-      break;
-    case GLFW_KEY_DOWN:
-      eye_y_offset -= EYE_TRANSLATION_OFFSET_GAP;
-      break;
-    case GLFW_KEY_LEFT:
-      eye_x_offset -= EYE_TRANSLATION_OFFSET_GAP;
-      break;
-    case GLFW_KEY_RIGHT:
-      eye_x_offset += EYE_TRANSLATION_OFFSET_GAP;
-      break;
-    case GLFW_KEY_ESCAPE:
-      Exit();
-      break;
-    }
-
-    if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING) {
-      Reshape(window, target_image_width, target_image_height);
-    } else {
-      Reshape(window, image.size().width, image.size().height);
-    }
-  }
-}
+//void Application::Keyboard(GLFWwindow *window, int key, int scancode, int action, int mods) {
+//  if (action == GLFW_PRESS) {
+//
+//    if (key == GLFW_KEY_1 || key == GLFW_KEY_2 || key == GLFW_KEY_3) {
+//      ChangeGLTexture(image);
+//    }
+//    switch (key) {
+//    case GLFW_KEY_F1:
+//      printf("Input image file name : ");
+//      char buffer[1 << 10];
+//      scanf("%s", buffer);
+//      input_file_name = std::string(buffer);
+//      ReadImage(input_file_name);
+//      PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
+//      break;
+//    case GLFW_KEY_GRAVE_ACCENT:
+//      is_viewing_mesh = !is_viewing_mesh;
+//      break;
+//    case GLFW_KEY_1:
+//      program_mode = VIEWING_IMAGE;
+//      break;
+//    case GLFW_KEY_2:
+//      program_mode = PATCH_BASED_WARPING;
+//      selected_quad_mesh_vertex_index = -1;
+//      break;
+//    case GLFW_KEY_3:
+//      program_mode = FOCUS_WARPING;
+//      selected_quad_mesh_vertex_index = -1;
+//      break;
+//    case GLFW_KEY_4:
+//      program_mode = VIEWING_IMAGE;
+//      ChangeGLTexture(image_after_segmentation);
+//      break;
+//    case GLFW_KEY_5:
+//      program_mode = VIEWING_IMAGE;
+//      ChangeGLTexture(saliency_image);
+//      break;
+//    case GLFW_KEY_6:
+//      program_mode = VIEWING_IMAGE;
+//      ChangeGLTexture(significance_image);
+//      break;
+//    case GLFW_KEY_7:
+//      program_mode = VIEWING_TRIANGLE_MESH;
+//      selected_triangle_mesh_vertex_index = -1;
+//      break;
+//    case GLFW_KEY_0:
+//      is_viewing_mesh_point = !is_viewing_mesh_point;
+//      break;
+//    case GLFW_KEY_P:
+//      SaveScreen("warping_" + input_file_name);
+//      break;
+//    case GLFW_KEY_R:
+//      if (!is_recording_screen) {
+//        recorded_images.clear();
+//      } else {
+//        RecordScreen("warping.avi", 30);
+//      }
+//      is_recording_screen = !is_recording_screen;
+//      break;
+//    case GLFW_KEY_W:
+//      PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
+//      break;
+//    case GLFW_KEY_KP_ADD:
+//      if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING || program_mode == VIEWING_TRIANGLE_MESH) {
+//        current_mesh_size += MESH_SIZE_GAP;
+//        ReBuildMesh();
+//      }
+//      break;
+//    case GLFW_KEY_KP_SUBTRACT:
+//      if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING || program_mode == VIEWING_TRIANGLE_MESH) {
+//        current_mesh_size -= MESH_SIZE_GAP;
+//        ReBuildMesh();
+//      }
+//      break;
+//    case GLFW_KEY_UP:
+//      eye_y_offset += EYE_TRANSLATION_OFFSET_GAP;
+//      break;
+//    case GLFW_KEY_DOWN:
+//      eye_y_offset -= EYE_TRANSLATION_OFFSET_GAP;
+//      break;
+//    case GLFW_KEY_LEFT:
+//      eye_x_offset -= EYE_TRANSLATION_OFFSET_GAP;
+//      break;
+//    case GLFW_KEY_RIGHT:
+//      eye_x_offset += EYE_TRANSLATION_OFFSET_GAP;
+//      break;
+//    case GLFW_KEY_ESCAPE:
+//      Exit();
+//      break;
+//    }
+//
+//    if (program_mode == PATCH_BASED_WARPING || program_mode == FOCUS_WARPING) {
+//      Reshape(window, target_image_width, target_image_height);
+//    } else {
+//      Reshape(window, image.size().width, image.size().height);
+//    }
+//  }
+//}
 
 void Application::Reshape(GLFWwindow *window, int w, int h) {
   h = h < 1 ? 1 : h;
@@ -599,7 +443,7 @@ void Application::Reshape(GLFWwindow *window, int w, int h) {
   glfwSetWindowTitle(window, (std::string(screen_size_str) + window_name).c_str());
 }
 
-;void Application::Mouse(GLFWwindow *window, int button, int action, int mods) {
+; void Application::Mouse(GLFWwindow *window, int button, int action, int mods) {
   if (action == GLFW_PRESS) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
       //float world_x = x;
@@ -670,7 +514,7 @@ void Application::ChangeGLTexture(void *texture_pointer, int width, int height) 
 }
 
 void Application::PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
-  if (!data_for_warping_were_generated) {
+  if (!data_for_image_warping_were_generated) {
     puts("Start : Gaussian smoothing");
     const double SMOOTH_SIGMA = 0.8;
     const cv::Size K_SIZE(3, 3);
@@ -735,7 +579,7 @@ void Application::PatchBasedImageWarpingForContentAwareRetargeting(const int tar
 
     puts("Done : Image saliency calculation");
 
-    data_for_warping_were_generated = true;
+    data_for_image_warping_were_generated = true;
   }
 
   puts("Start : Build mesh and graph");
@@ -755,14 +599,14 @@ void Application::PatchBasedImageWarpingForContentAwareRetargeting(const int tar
   }
 
   saliency_of_mesh_vertex.clear();
-  saliency_of_mesh_vertex = std::vector<double>(image_graph.V.size());
+  saliency_of_mesh_vertex = std::vector<double>(image_graph.vertices_.size());
 
-  for (size_t vertex_index = 0; vertex_index < image_graph.V.size(); ++vertex_index) {
+  for (size_t vertex_index = 0; vertex_index < image_graph.vertices_.size(); ++vertex_index) {
     float original_x = quad_mesh_vertex_list[vertex_index].first;
     float original_y = quad_mesh_vertex_list[vertex_index].second;
     saliency_of_mesh_vertex[vertex_index] = saliency_of_patch[group_of_pixel[original_y][original_x]];
-    quad_mesh_vertex_list[vertex_index].first = image_graph.V[vertex_index].first;
-    quad_mesh_vertex_list[vertex_index].second = image_graph.V[vertex_index].second;
+    quad_mesh_vertex_list[vertex_index].first = image_graph.vertices_[vertex_index].first;
+    quad_mesh_vertex_list[vertex_index].second = image_graph.vertices_[vertex_index].second;
   }
 
   selected_quad_mesh_vertex_index = -1;
@@ -804,7 +648,7 @@ void Application::SaveScreen(const std::string &filename) {
   cv::cvtColor(screen_image, screen_image, CV_BGR2RGB);
   cv::flip(screen_image, screen_image, 0);
   cv::imwrite(filename, screen_image);
-  delete []screen_image_data;
+  delete[]screen_image_data;
   printf("Screen saved : %s\n", filename.c_str());
 }
 
@@ -821,53 +665,6 @@ void Application::RecordScreen(const std::string &filename, const int fps) {
 }
 
 void Application::Initial() {
-  if (!glfwInit ()) {
-    exit(EXIT_FAILURE);
-  }
-
-  window = glfwCreateWindow(1, 1, window_name.c_str(), NULL, NULL);
-
-  if (!window) {
-    glfwTerminate();
-    exit(EXIT_FAILURE);
-  }
-
-  glewExperimental = GL_TRUE;
-  glewInit();
-
-  glfwSetWindowUserPointer(window, this);
-
-  auto reshape_callback = [](GLFWwindow *window, int w, int h) {
-    static_cast<Application *>(glfwGetWindowUserPointer(window))->Reshape(window, w, h);
-  };
-
-  auto keyboard_callback = [](GLFWwindow *window, int key, int scancode, int action, int mods) {
-    static_cast<Application *>(glfwGetWindowUserPointer(window))->Keyboard(window, key, scancode, action, mods);
-  };
-
-  auto mouse_callback = [](GLFWwindow *window, int button, int action, int mods) {
-    static_cast<Application *>(glfwGetWindowUserPointer(window))->Mouse(window, button, action, mods);
-  };
-
-  auto motion_callback = [](GLFWwindow *window, double x, double y) {
-    static_cast<Application *>(glfwGetWindowUserPointer(window))->Motion(window, x, y);
-  };
-
-  auto scroll_callback = [](GLFWwindow *window, double x_offset, double y_offset) {
-    static_cast<Application *>(glfwGetWindowUserPointer(window))->Scroll(window, x_offset, y_offset);
-  };
-
-
-  glfwSetFramebufferSizeCallback(window, reshape_callback);
-  glfwSetKeyCallback(window, keyboard_callback);
-  glfwSetMouseButtonCallback(window, mouse_callback);
-  glfwSetCursorPosCallback(window, motion_callback);
-  glfwSetScrollCallback(window, scroll_callback);
-
-  glfwMakeContextCurrent(window);
-  glfwSwapInterval(1);
-
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 }
 
 void Application::ReadImage(const std::string &filename) {
@@ -897,7 +694,7 @@ void Application::ReadImage(const std::string &filename) {
   target_image_width = image.size().width;
   target_image_height = image.size().height;
 
-  data_for_warping_were_generated = false;
+  data_for_image_warping_were_generated = false;
 }
 
 void Application::Run() {
@@ -907,15 +704,12 @@ void Application::Run() {
 
   PatchBasedImageWarpingForContentAwareRetargeting(target_image_width, target_image_height, current_mesh_size, current_mesh_size);
 
-  while (!glfwWindowShouldClose(window)) {
+  while (1) {
     RenderGL();
     if (is_recording_screen) {
-      glfwPollEvents();
       const std::string temp_frame_image_name = "warping_" + input_file_name;
       SaveScreen(temp_frame_image_name);
       recorded_images.push_back(cv::imread(temp_frame_image_name));
-    } else {
-      glfwWaitEvents();
     }
   }
 
@@ -923,7 +717,6 @@ void Application::Run() {
 }
 
 void Application::Exit() {
-  glfwTerminate();
   exit(0);
 }
 

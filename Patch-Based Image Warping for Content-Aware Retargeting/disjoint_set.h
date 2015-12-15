@@ -4,7 +4,9 @@
 #include <vector>
 
 class DisjointSet {
- public:
+
+public:
+
   DisjointSet() {
   }
 
@@ -41,7 +43,8 @@ class DisjointSet {
     group_of_element_at[x] = group_of_y;
   }
 
- private:
+private:
+
   int group_count;
   std::vector<int> group_of_element_at;
   std::vector<int> group_size;

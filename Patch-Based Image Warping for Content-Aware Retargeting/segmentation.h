@@ -1,28 +1,26 @@
-#ifndef SEGMENTATION_H_
-#define SEGMENTATION_H_
-
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-
-#include <algorithm>
+#pragma once
 
 #include "graph.h"
 #include "disjoint_set.h"
 
-typedef Graph2D<float> GraphType;
+#include <algorithm>
 
-void BuildGraphFromImage(const cv::Mat &image, GraphType &G) {
-  G = GraphType();
+#include <glm\glm.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
-  G.V.reserve(image.size().width * image.size().height);
-  G.E.reserve(image.size().width * image.size().height * 4);
+void BuildGraphFromImage(const cv::Mat &image, Graph<glm::vec2> &target_graph) {
+  target_graph = Graph<glm::vec2>();
+
+  target_graph.vertices_.reserve(image.size().width * image.size().height);
+  target_graph.edges_.reserve(image.size().width * image.size().height * 4);
 
   const int DELTA_R[4] = {0, 1, 1, -1};
   const int DELTA_C[4] = {1, 0, 1, 1};
 
   for (int r = 0; r < image.size().height; ++r) {
     for (int c = 0; c < image.size().width; ++c) {
-      G.V.push_back(std::pair<int, int>(c, r));
+      target_graph.vertices_.push_back(glm::vec2(c, r));
 
       int index = r * image.size().width + c;
 
@@ -31,7 +29,7 @@ void BuildGraphFromImage(const cv::Mat &image, GraphType &G) {
         int neighbor_c = c + DELTA_C[direction];
         if (neighbor_r >= 0 && neighbor_r < image.size().height && neighbor_c >= 0 && neighbor_c < image.size().width) {
           int neighbor_index = neighbor_r * image.size().width + neighbor_c;
-          std::pair<int, int> e(index, neighbor_index);
+          std::pair<size_t, size_t> e(index, neighbor_index);
 
           double w[3];
           for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
@@ -40,43 +38,43 @@ void BuildGraphFromImage(const cv::Mat &image, GraphType &G) {
 
           double edge_weight = sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
 
-          G.E.push_back(Edge(e, edge_weight));
+          target_graph.edges_.push_back(Edge(e, edge_weight));
         }
       }
     }
   }
 }
 
-cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector<int> > &group_of_pixel, const double k, const int min_patch_size, const double similar_color_patch_merge_threshold) {
+cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::vector<std::vector<int> > &group_of_pixel, const double k, const int min_patch_size, const double similar_color_patch_merge_threshold) {
 
-  BuildGraphFromImage(image, G);
+  BuildGraphFromImage(image, target_graph);
 
-  sort(G.E.begin(), G.E.end());
+  sort(target_graph.edges_.begin(), target_graph.edges_.end());
 
-  DisjointSet vertex_disjoint_set(G.V.size());
+  DisjointSet vertex_disjoint_set(target_graph.vertices_.size());
 
-  std::vector<double> thresholds(G.V.size());
+  std::vector<double> thresholds(target_graph.vertices_.size());
   for (auto &threshold : thresholds) {
     threshold = 1 / k;
   }
 
   // Segmentation
-  for (const auto &edge : G.E) {
-    int group_of_x = vertex_disjoint_set.FindGroup(edge.e.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(edge.e.second);
+  for (const auto &edge : target_graph.edges_) {
+    int group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
+    int group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
     if (group_of_x == group_of_y) {
       continue;
     }
-    if (edge.w <= std::min(thresholds[group_of_x], thresholds[group_of_y])) {
+    if (edge.weight_ <= std::min(thresholds[group_of_x], thresholds[group_of_y])) {
       vertex_disjoint_set.UnionGroup(group_of_x, group_of_y);
-      thresholds[group_of_x] = edge.w + (k / vertex_disjoint_set.SizeOfGroup(edge.e.first));
+      thresholds[group_of_x] = edge.weight_ + (k / vertex_disjoint_set.SizeOfGroup(edge.edge_indices_pair_.first));
     }
   }
 
   // Deal with the smaller set
-  for (const auto &edge : G.E) {
-    int group_of_x = vertex_disjoint_set.FindGroup(edge.e.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(edge.e.second);
+  for (const auto &edge : target_graph.edges_) {
+    int group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
+    int group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
     if (group_of_x == group_of_y) {
       continue;
     }
@@ -86,7 +84,7 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
   }
 
   // Calculate the color of each group
-  std::vector<cv::Vec3d> group_color(G.V.size());
+  std::vector<cv::Vec3d> group_color(target_graph.vertices_.size());
   for (int r = 0; r < image.size().height; ++r) {
     for (int c = 0; c < image.size().width; ++c) {
       int index = r * image.size().width + c;
@@ -101,9 +99,9 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
   }
 
   // Deal with the similar color set
-  for (const auto &edge : G.E) {
-    int group_of_x = vertex_disjoint_set.FindGroup(edge.e.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(edge.e.second);
+  for (const auto &edge : target_graph.edges_) {
+    int group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
+    int group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
     if (group_of_x == group_of_y) {
       continue;
     }
@@ -137,11 +135,11 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
     }
   }
 
-  cv::Mat image_after_segmentation = image;
+  cv::Mat image_after_segmentation = image.clone();
 
   // Write the pixel value
-  group_of_pixel.clear();
   group_of_pixel = std::vector<std::vector<int> >(image.size().height, std::vector<int>(image.size().width));
+
   for (int r = 0; r < image.size().height; ++r) {
     for (int c = 0; c < image.size().width; ++c) {
       int index = r * image.size().width + c;
@@ -155,5 +153,3 @@ cv::Mat Segmentation(const cv::Mat &image, GraphType &G, std::vector<std::vector
 
   return image_after_segmentation;
 }
-
-#endif

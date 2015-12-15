@@ -1,0 +1,822 @@
+#include "gl_form.h"
+
+using namespace System;
+using namespace System::Windows::Forms;
+
+namespace PatchBasedImageWarpingForContentAwareRetargeting {
+
+  [STAThread]
+  int main(array<String^> ^args) {
+
+    //std::string input_file_name = "leaf.bmp";
+
+    Application::EnableVisualStyles();
+    Application::SetCompatibleTextRenderingDefault(false);
+    PatchBasedImageWarpingForContentAwareRetargeting::GLForm form;
+    Application::Run(%form);
+    return 0;
+  }
+
+  GLForm::GLForm() {
+    InitializeComponent();
+
+    srand((unsigned)time(0));
+
+    InitializeOpenGL();
+
+    //ChangeProgramStatus(VIEW_BASIC_DEMO);
+
+    open_image_file_tool_strip_menu_item_->Click += gcnew System::EventHandler(this, &PatchBasedImageWarpingForContentAwareRetargeting::GLForm::OnButtonsClick);
+    open_video_file_tool_strip_menu_item_->Click += gcnew System::EventHandler(this, &PatchBasedImageWarpingForContentAwareRetargeting::GLForm::OnButtonsClick);
+    save_screen_tool_strip_menu_item_->Click += gcnew System::EventHandler(this, &PatchBasedImageWarpingForContentAwareRetargeting::GLForm::OnButtonsClick);
+
+    is_dragging_panel = false;
+
+    gl_panel_->MouseDown += gcnew System::Windows::Forms::MouseEventHandler(this, &PatchBasedImageWarpingForContentAwareRetargeting::GLForm::OnMouseDown);
+    gl_panel_->MouseUp += gcnew System::Windows::Forms::MouseEventHandler(this, &PatchBasedImageWarpingForContentAwareRetargeting::GLForm::OnMouseUp);
+    gl_panel_->MouseMove += gcnew System::Windows::Forms::MouseEventHandler(this, &PatchBasedImageWarpingForContentAwareRetargeting::GLForm::OnMouseMove);
+
+    this->KeyDown += gcnew System::Windows::Forms::KeyEventHandler(this, &PatchBasedImageWarpingForContentAwareRetargeting::GLForm::OnKeyDown);
+  }
+
+  bool GLForm::ParseFileIntoString(const std::string &file_path, std::string &file_string) {
+    std::ifstream file_stream(file_path);
+    if (!file_stream.is_open()) {
+      return false;
+    }
+    file_string = std::string(std::istreambuf_iterator<char>(file_stream), std::istreambuf_iterator<char>());
+    return true;
+  }
+
+  void GLForm::InitializeOpenGL() {
+
+    // Get Handle
+    hwnd = (HWND)gl_panel_->Handle.ToPointer();
+    hdc = GetDC(hwnd);
+    wglSwapBuffers(hdc);
+
+    // Set pixel format
+    PIXELFORMATDESCRIPTOR pfd;
+    pfd.nVersion = 1;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pfd.iPixelType = (byte)(PFD_TYPE_RGBA);
+    pfd.cColorBits = 32;
+    pfd.cDepthBits = 32;
+    pfd.iLayerType = (byte)(PFD_MAIN_PLANE);
+
+    SetPixelFormat(hdc, ChoosePixelFormat(hdc, &pfd), &pfd);
+
+    // Create OpenGL Rendering Context
+    hrc = (wglCreateContext(hdc));
+    if (!hrc) {
+      std::cerr << "wglCreateContext failed.\n";
+    }
+
+    // Assign OpenGL Rendering Context
+    if (!wglMakeCurrent(hdc, hrc)) {
+      std::cerr << "wglMakeCurrent failed.\n";
+    }
+
+    if (glewInit() != GLEW_OK) {
+      std::cerr << "OpenGL initialize failed.\n";
+    }
+
+    if (!GLEW_VERSION_2_0) {
+      std::cerr << "Your graphic card does not support OpenGL 2.0.\n";
+    }
+
+    glewExperimental = GL_TRUE;
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    std::string vertex_shader_string;
+    std::string fragment_shader_string;
+
+    ParseFileIntoString(DEFAULT_VERTEX_SHADER_FILE_PATH, vertex_shader_string);
+    ParseFileIntoString(DEFAULT_FRAGMENT_SHADER_FILE_PATH, fragment_shader_string);
+
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    const GLchar *vertex_shader_pointer = (const GLchar*)vertex_shader_string.c_str();
+    glShaderSource(vertex_shader, 1, &vertex_shader_pointer, NULL);
+    glCompileShader(vertex_shader);
+
+    int shader_compile_status;
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &shader_compile_status);
+    if (shader_compile_status != GL_TRUE) {
+      std::cerr << "Could not compile the shader " << DEFAULT_VERTEX_SHADER_FILE_PATH << " .\n";
+    }
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    const GLchar *fragment_shader_pointer = (const GLchar*)fragment_shader_string.c_str();
+    glShaderSource(fragment_shader, 1, &fragment_shader_pointer, NULL);
+    glCompileShader(fragment_shader);
+
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &shader_compile_status);
+    if (shader_compile_status != GL_TRUE) {
+      std::cerr << "Could not compile the shader " << DEFAULT_FRAGMENT_SHADER_FILE_PATH << " .\n";
+    }
+
+    shader_program_id = glCreateProgram();
+    glAttachShader(shader_program_id, vertex_shader);
+    glAttachShader(shader_program_id, fragment_shader);
+    glLinkProgram(shader_program_id);
+
+    int shader_link_status;
+    glGetProgramiv(shader_program_id, GL_LINK_STATUS, &shader_link_status);
+    if (shader_link_status != GL_TRUE) {
+      std::cerr << "Could not link the shader.\n";
+    }
+
+    int shader_validate_status;
+    glValidateProgram(shader_program_id);
+    glGetProgramiv(shader_program_id, GL_VALIDATE_STATUS, &shader_validate_status);
+    if (shader_validate_status != GL_TRUE) {
+      std::cerr << "Could not validate the shader.\n";
+    }
+
+    shader_attribute_vertex_position_id = glGetAttribLocation(shader_program_id, SHADER_ATTRIBUTE_VERTEX_POSITION_NAME.c_str());
+    if (shader_attribute_vertex_position_id == -1) {
+      std::cerr << "Could not bind attribute " << SHADER_ATTRIBUTE_VERTEX_POSITION_NAME << ".\n";
+    }
+
+    shader_attribute_vertex_color_id = glGetAttribLocation(shader_program_id, SHADER_ATTRIBUTE_VERTEX_COLOR_NAME.c_str());
+    if (shader_attribute_vertex_color_id == -1) {
+      std::cerr << "Could not bind attribute " << SHADER_ATTRIBUTE_VERTEX_COLOR_NAME << ".\n";
+    }
+
+    shader_attribute_vertex_uv_id = glGetAttribLocation(shader_program_id, SHADER_ATTRIBUTE_VERTEX_UV_NAME.c_str());
+    if (shader_attribute_vertex_uv_id == -1) {
+      std::cerr << "Could not bind attribute " << SHADER_ATTRIBUTE_VERTEX_UV_NAME << ".\n";
+    }
+
+    shader_uniform_modelview_matrix_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_MODELVIEW_MATRIX_NAME.c_str());
+    if (shader_uniform_modelview_matrix_id == -1) {
+      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_MODELVIEW_MATRIX_NAME << ".\n";
+    }
+
+    shader_uniform_view_matrix_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_VIEW_MATRIX_NAME.c_str());
+    if (shader_uniform_view_matrix_id == -1) {
+      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_VIEW_MATRIX_NAME << ".\n";
+    }
+
+    shader_uniform_projection_matrix_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_PROJECTION_MATRIX_NAME.c_str());
+    if (shader_uniform_projection_matrix_id == -1) {
+      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_PROJECTION_MATRIX_NAME << ".\n";
+    }
+
+    shader_uniform_texture_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_TEXTURE_NAME.c_str());
+    if (shader_uniform_texture_id == -1) {
+      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_TEXTURE_NAME << ".\n";
+    }
+
+    shader_uniform_texture_flag_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_TEXTURE_FLAG_NAME.c_str());
+    if (shader_uniform_texture_flag_id == -1) {
+      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_TEXTURE_FLAG_NAME << ".\n";
+    }
+  }
+
+  void GLForm::RenderGLPanel() {
+    wglMakeCurrent(hdc, hrc);
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    float aspect_ratio = gl_panel_->Width / (float)gl_panel_->Height;
+
+    glm::mat4 projection_matrix = glm::perspective(glm::radians(FOVY), aspect_ratio, 0.01f, 10000.0f);
+
+    glm::mat4 view_matrix = glm::lookAt(eye_position * eye_position_scale, look_at_position, glm::vec3(0.0f, 1.0f, 0.0f));
+
+    glm::mat4 modelview_matrix = glm::mat4(1.0f);
+
+    glUseProgram(shader_program_id);
+
+    glUniformMatrix4fv(shader_uniform_projection_matrix_id, 1, GL_FALSE, glm::value_ptr(projection_matrix));
+    glUniformMatrix4fv(shader_uniform_view_matrix_id, 1, GL_FALSE, glm::value_ptr(view_matrix));
+
+    gl_panel_image_mesh.Draw(modelview_matrix);
+
+    SwapBuffers(hdc);
+  }
+
+  cv::Mat GLForm::GLScreenToMat() {
+    unsigned char *screen_image_data(new unsigned char[3 * gl_panel_->Width * gl_panel_->Height]);
+    glReadBuffer(GL_FRONT);
+    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, screen_image_data);
+
+    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, screen_image_data);
+    cv::flip(screen_image, screen_image, 0);
+
+    //delete screen_image_data;
+    return screen_image;
+  }
+
+  void GLForm::SaveGLScreen(const std::string &file_path) {
+    unsigned char *screen_image_data(new unsigned char[3 * gl_panel_->Width * gl_panel_->Height]);
+    glReadBuffer(GL_FRONT);
+    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, screen_image_data);
+
+    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, screen_image_data);
+    cv::flip(screen_image, screen_image, 0);
+    cv::imwrite(file_path, screen_image);
+    std::cout << "Screen saved : " << file_path << "\n";
+
+    delete screen_image_data;
+  }
+
+  void GLForm::ChangeGLPanelSize(int new_panel_width, int new_panel_height) {
+    new_panel_width = std::max(MIN_PANEL_WIDTH, new_panel_width);
+    new_panel_height = std::max(MIN_PANEL_HEIGHT, new_panel_height);
+
+    new_panel_width = std::min(MAX_PANEL_WIDTH, new_panel_width);
+    new_panel_height = std::min(MAX_PANEL_HEIGHT, new_panel_height);
+
+    std::cout << "Panel size : " << new_panel_width << " X " << new_panel_height << "\n";
+
+    gl_panel_->Width = new_panel_width;
+    gl_panel_->Height = new_panel_height;
+
+    glViewport(0, 0, gl_panel_->Width, gl_panel_->Height);
+
+    double cotanget_of_half_of_fovy = 1.0 / tan(glm::radians(FOVY / 2.0f));
+
+    eye_position = glm::vec3(new_panel_width / 2.0f, new_panel_height / 2.0f, cotanget_of_half_of_fovy * (new_panel_height / 2.0));
+    look_at_position = glm::vec3(new_panel_width / 2.0f, new_panel_height / 2.0f, 0);
+
+    RenderGLPanel();
+  }
+
+  void GLForm::BuildGridMeshAndGraphForImage(const cv::Mat &image, GLMesh &target_mesh, Graph<glm::vec2> &target_graph, float grid_size) {
+    target_graph = Graph<glm::vec2>();
+
+    size_t mesh_column_count = (size_t)(image.size().width / grid_size) + 1;
+    size_t mesh_row_count = (size_t)(image.size().height / grid_size) + 1;
+
+    float real_mesh_width = image.size().width / (float)(mesh_column_count - 1);
+    float real_mesh_height = image.size().height / (float)(mesh_row_count - 1);
+
+    for (size_t r = 0; r < mesh_row_count; ++r) {
+      for (size_t c = 0; c < mesh_column_count; ++c) {
+        target_graph.vertices_.push_back(glm::vec2(c * real_mesh_width, r * real_mesh_height));
+      }
+    }
+
+    target_mesh = GLMesh();
+    target_mesh.vertices_type = GL_QUADS;
+
+    int i = 0;
+    for (int r = 0; r < mesh_row_count - 1; ++r) {
+      for (int c = 0; c < mesh_column_count - 1; ++c) {
+        std::vector<size_t> vertex_indices;
+
+        size_t base_index = r * (mesh_column_count)+c;
+        vertex_indices.push_back(base_index);
+        vertex_indices.push_back(base_index + mesh_column_count);
+        vertex_indices.push_back(base_index + mesh_column_count + 1);
+        vertex_indices.push_back(base_index + 1);
+
+        if (!c) {
+          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[1])));
+        }
+        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[1], vertex_indices[2])));
+        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[2], vertex_indices[3])));
+        if (!r) {
+          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[3], vertex_indices[0])));
+        }
+
+        for (const auto &vertex_index : vertex_indices) {
+          target_mesh.vertices_.push_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0));
+          target_mesh.uvs_.push_back(glm::vec2(target_graph.vertices_[vertex_index].x / (float)image.size().width, target_graph.vertices_[vertex_index].y / (float)image.size().height));
+        }
+
+      }
+    }
+  }
+
+  void GLForm::PatchBasedImageWarpingForContentAwareRetargeting(const int target_image_width, const int target_image_height, const float grid_size) {
+    if (!source_image.size().width || !source_image.size().height) {
+      return;
+    }
+
+    if (!data_for_image_warping_were_generated) {
+      puts("Start : Gaussian smoothing");
+      const double SMOOTH_SIGMA = 0.8;
+      const cv::Size K_SIZE(3, 3);
+      cv::GaussianBlur(source_image, source_image_after_smoothing, K_SIZE, SMOOTH_SIGMA);
+      cv::imwrite(source_image_file_directory + "smooth_" + source_image_file_name, source_image_after_smoothing);
+      puts("Done : Gaussian smoothing");
+
+      puts("Start : Image segmentation");
+      const double SEGMENTATION_K = (source_image.size().width + source_image.size().height) / 1.75;
+      const double SEGMENTATION_MIN_PATCH_SIZE = (source_image.size().width * source_image.size().height) * 0.0001;
+      const double SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD = 20;
+
+      source_image_after_segmentation = Segmentation(source_image, image_graph, group_of_pixel, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
+      cv::imwrite(source_image_file_directory + "segmentation_" + source_image_file_name, source_image_after_segmentation);
+      puts("Done : Image segmentation");
+
+      puts("Start : Image saliency calculation");
+      const double SALIENCY_C = 3;
+      const double SALIENCY_K = 64;
+      saliency_map_of_source_image = CalculateContextAwareSaliencyMapWithMatlabProgram(source_image, saliency_map, source_image_file_directory + source_image_file_name, source_image_file_directory + "saliency_" + source_image_file_name);
+
+      // Calculate the saliency value of each patch
+      for (int r = 0; r < source_image.size().height; ++r) {
+        saliency_map[r].push_back(saliency_map[r].back());
+        group_of_pixel[r].push_back(group_of_pixel[r].back());
+      }
+      saliency_map.push_back(saliency_map.back());
+      group_of_pixel.push_back(group_of_pixel.back());
+
+      saliency_of_patch = std::vector<double>((source_image.size().width + 1) * (source_image.size().height + 1));
+      std::vector<int> group_count((source_image.size().width + 1) * (source_image.size().height + 1));
+      for (int r = 0; r < source_image.size().height + 1; ++r) {
+        for (int c = 0; c < source_image.size().width + 1; ++c) {
+          ++group_count[group_of_pixel[r][c]];
+          saliency_of_patch[group_of_pixel[r][c]] += saliency_map[r][c];
+        }
+      }
+
+      double min_saliency = 2e9, max_saliency = -2e9;
+      for (size_t patch_index = 0; patch_index < saliency_of_patch.size(); ++patch_index) {
+        if (group_count[patch_index]) {
+          saliency_of_patch[patch_index] /= (double)group_count[patch_index];
+        }
+        min_saliency = std::min(min_saliency, saliency_of_patch[patch_index]);
+        max_saliency = std::max(max_saliency, saliency_of_patch[patch_index]);
+      }
+
+      // Normalize saliency values
+      for (size_t patch_index = 0; patch_index < saliency_of_patch.size(); ++patch_index) {
+        saliency_of_patch[patch_index] = (saliency_of_patch[patch_index] - min_saliency) / (max_saliency - min_saliency);
+      }
+
+      significance_map_of_source_image = cv::Mat(source_image.size(), source_image.type());
+      for (int r = 0; r < source_image.size().height; ++r) {
+        for (int c = 0; c < source_image.size().width; ++c) {
+          double vertex_saliency = saliency_of_patch[group_of_pixel[r][c]];
+          significance_map_of_source_image.at<cv::Vec3b>(r, c) = SaliencyValueToSignifanceColor(vertex_saliency);
+        }
+      }
+      cv::imwrite(source_image_file_directory + "significance_" + source_image_file_name, significance_map_of_source_image);
+
+      puts("Done : Image saliency calculation");
+
+      data_for_image_warping_were_generated = true;
+    }
+
+    puts("Start : Build mesh and graph");
+    BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, grid_size);
+    puts("Done : Build mesh and graph");
+
+    //if (program_mode == PATCH_BASED_WARPING) {
+
+    puts("Start : Patch based warping");
+    PatchBasedWarping(source_image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, grid_size, grid_size);
+    puts("Done : Patch based warping");
+    printf("New image size : %d %d\n", target_image_width, target_image_height);
+    //} else if (program_mode == FOCUS_WARPING) {
+    //  puts("Start : Focus warping");
+    //  FocusWarping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height, focus_mesh_scale, focus_x, focus_y);
+    //  puts("Done : Focus warping");
+    //  printf("New image size : %d %d\n", target_image_width, target_image_height);
+    //}
+
+    saliency_of_mesh_vertex.clear();
+    saliency_of_mesh_vertex = std::vector<double>(image_graph.vertices_.size());
+
+    for (size_t vertex_index = 0; vertex_index < image_graph.vertices_.size(); ++vertex_index) {
+      float original_x = gl_panel_image_mesh.vertices_[vertex_index].x;
+      float original_y = gl_panel_image_mesh.vertices_[vertex_index].y;
+      saliency_of_mesh_vertex[vertex_index] = saliency_of_patch[group_of_pixel[original_y][original_x]];
+    }
+
+    int mesh_column_count = (int)(source_image.size().width / grid_size) + 1;
+    int mesh_row_count = (int)(source_image.size().height / grid_size) + 1;
+
+    float real_mesh_width = source_image.size().width / (float)(mesh_column_count - 1);
+    float real_mesh_height = source_image.size().height / (float)(mesh_row_count - 1);
+
+    gl_panel_image_mesh.vertices_.clear();
+
+    for (int r = 0; r < mesh_row_count - 1; ++r) {
+      for (int c = 0; c < mesh_column_count - 1; ++c) {
+        std::vector<size_t> vertex_indices;
+
+        size_t base_index = r * (mesh_column_count)+c;
+        vertex_indices.push_back(base_index);
+        vertex_indices.push_back(base_index + mesh_column_count);
+        vertex_indices.push_back(base_index + mesh_column_count + 1);
+        vertex_indices.push_back(base_index + 1);
+
+        for (const auto &vertex_index : vertex_indices) {
+          gl_panel_image_mesh.vertices_.push_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
+        }
+      }
+    }
+
+    GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
+
+    gl_panel_image_mesh.Upload();
+
+    //double cotanget_of_half_of_fovy = 1.0 / tan(glm::radians(FOVY / 2.0f));
+    //eye_position.z = cotanget_of_half_of_fovy * (target_image_height / 2.0);
+
+    RenderGLPanel();
+  }
+
+  void GLForm::ContentAwareVideoRetargetingUsingObjectPreservingWarping(const int target_video_width, const int target_video_height, const float grid_size) {
+    if (!source_video_frames.size() || !source_video_frames[0].size().height || !source_video_frames[0].size().width) {
+      return;
+    }
+
+    const std::string segmentation_video_path = source_video_file_directory + "segmentation_" + source_video_file_name + ".avi";
+    const std::string significance_video_path = source_video_file_directory + "significance_" + source_video_file_name + ".avi";
+
+    if (!std::fstream(significance_video_path).good() || !std::fstream(segmentation_video_path).good()) {
+      std::cout << "Significance data for video warping not found.\n Generating new one.\n";
+      std::map<size_t, size_t> object_sizes;
+      saliency_of_object.clear();
+      source_video_frames_after_segmentation.clear();
+
+      if (!std::fstream(segmentation_video_path).good()) {
+        VideoSegmentation(source_video_file_directory, source_video_file_name);
+      }
+
+      cv::VideoWriter segmentation_video_writer;
+      segmentation_video_writer.open(segmentation_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, source_video_frames[0].size());
+
+      cv::VideoWriter saliency_video_writer;
+      saliency_video_writer.open(source_video_file_directory + "saliency_" + source_video_file_name + ".avi", CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, source_video_frames[0].size());
+
+      for (size_t t = 0; t < source_video_frames.size(); ++t) {
+        std::ostringstream video_frame_name_oss;
+        video_frame_name_oss << "frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+
+        if (!std::fstream(source_video_file_directory + video_frame_name_oss.str()).good()) {
+          cv::imwrite(source_video_file_directory + video_frame_name_oss.str(), source_video_frames[t]);
+        }
+
+        std::ostringstream video_frame_saliency_name_oss;
+        video_frame_saliency_name_oss << "saliency_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+
+        std::vector<std::vector<double> > frame_saliency_map;
+        cv::Mat saliency_frame = CalculateContextAwareSaliencyMapWithMatlabProgram(source_video_frames[t], frame_saliency_map, source_video_file_directory + video_frame_name_oss.str(), source_video_file_directory + video_frame_saliency_name_oss.str());
+
+        std::ostringstream video_frame_segmentation_name_oss;
+        video_frame_segmentation_name_oss << "segmentation_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+
+        if (std::fstream(source_video_file_directory + video_frame_segmentation_name_oss.str()).good()) {
+          cv::Mat segmented_frame = cv::imread(source_video_file_directory + video_frame_segmentation_name_oss.str());
+          source_video_frames_after_segmentation.push_back(segmented_frame);
+          for (size_t r = 0; r < segmented_frame.size().height; ++r) {
+            for (size_t c = 0; c < segmented_frame.size().width; ++c) {
+              size_t pixel_group = Vec3bToValue(segmented_frame.at<cv::Vec3b>(r, c));
+              ++object_sizes[pixel_group];
+              saliency_of_object[pixel_group] += frame_saliency_map[r][c];
+            }
+          }
+
+          segmentation_video_writer.write(segmented_frame);
+          saliency_video_writer.write(saliency_frame);
+        }
+      }
+
+      std::cout << "Segmented frames and saliency frames are loaded.\n";
+
+      std::vector<std::vector<std::vector<int> > > group_of_pixel;
+      //size_t real_group_count = CalculateGroupFromSegmentedVideo(source_video_frames_after_segmentation, group_of_pixel);
+      //std::cout << "Real Group count : " << real_group_count << "\n";
+      std::cout << "Group count : " << saliency_of_object.size() << "\n";
+
+      // Calculate the saliency value of each object
+
+      double min_saliency = 2e9, max_saliency = -2e9;
+      for (const auto &object_size : object_sizes) {
+        size_t pixel_group = object_size.first;
+        if (object_sizes[pixel_group]) {
+          saliency_of_object[pixel_group] /= object_sizes[pixel_group];
+          min_saliency = std::min(min_saliency, saliency_of_object[pixel_group]);
+          max_saliency = std::max(max_saliency, saliency_of_object[pixel_group]);
+        }
+      }
+
+      std::map<size_t, cv::Vec3b> object_color;
+
+      // Normalize saliency values
+      for (const auto &object_size : object_sizes) {
+        size_t pixel_group = object_size.first;
+        if (object_sizes[pixel_group]) {
+          saliency_of_object[pixel_group] = (saliency_of_object[pixel_group] - min_saliency) / (max_saliency - min_saliency);
+        }
+        object_color[pixel_group].val[0] = rand() % 256;
+        object_color[pixel_group].val[1] = rand() % 256;
+        object_color[pixel_group].val[2] = rand() % 256;
+      }
+
+      //std::vector<size_t> real_object_size(real_group_count, 0);
+      //std::vector<double> real_saliency_of_object(real_group_count, 0);
+      //std::vector<cv::Vec3b> real_object_color(real_group_count);
+
+      //for (auto &color : real_object_color) {
+      //  color.val[0] = rand() % 256;
+      //  color.val[1] = rand() % 256;
+      //  color.val[2] = rand() % 256;
+      //}
+
+      min_saliency = 2e9;
+      max_saliency = -2e9;
+      for (size_t t = 0; t < source_video_frames_after_segmentation.size(); ++t) {
+        std::ostringstream video_frame_saliency_name_oss;
+        video_frame_saliency_name_oss << "saliency_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+        cv::Mat saliency_frame = cv::imread(source_video_file_directory + video_frame_saliency_name_oss.str());
+        for (size_t r = 0; r < source_video_frames_after_segmentation[t].size().height; ++r) {
+          for (size_t c = 0; c < source_video_frames_after_segmentation[t].size().width; ++c) {
+            //++real_object_size[group_of_pixel[t][r][c]];
+            //real_saliency_of_object[group_of_pixel[t][r][c]] += saliency_frame.at<cv::Vec3b>(r, c).val[0] / 255.0;
+          }
+        }
+      }
+
+      //for (size_t t = 0; t < real_object_size.size(); ++t) {
+      //  if (real_object_size[t]) {
+      //    real_saliency_of_object[t] /= (double)real_object_size[t];
+      //  }
+      //  min_saliency = std::min(min_saliency, real_saliency_of_object[t]);
+      //  max_saliency = std::max(max_saliency, real_saliency_of_object[t]);
+      //}
+
+      cv::VideoWriter significance_video_writer;
+      significance_video_writer.open(significance_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, source_video_frames[0].size());
+
+      for (size_t t = 0; t < source_video_frames_after_segmentation.size(); ++t) {
+        std::ostringstream video_frame_significance_name_oss;
+        video_frame_significance_name_oss << "significance_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+
+        cv::Mat significance_frame = source_video_frames_after_segmentation[t];
+        for (size_t r = 0; r < significance_frame.size().height; ++r) {
+          for (size_t c = 0; c < significance_frame.size().width; ++c) {
+            size_t pixel_group = Vec3bToValue(significance_frame.at<cv::Vec3b>(r, c));
+            double pixel_saliency = saliency_of_object[pixel_group];
+            significance_frame.at<cv::Vec3b>(r, c) = SaliencyValueToSignifanceColor(pixel_saliency);
+            //significance_frame.at<cv::Vec3b>(r, c) = object_color[pixel_group];
+
+            //size_t pixel_group = group_of_pixel[t][r][c];
+            //double pixel_saliency = real_saliency_of_object[pixel_group];
+            //significance_frame.at<cv::Vec3b>(r, c) = SaliencyValueToSignifanceColor(pixel_saliency);
+            ////significance_frame.at<cv::Vec3b>(r, c) = real_object_color[pixel_group];
+          }
+        }
+        cv::imwrite(source_video_file_directory + video_frame_significance_name_oss.str(), significance_frame);
+        significance_video_writer.write(significance_frame);
+      }
+
+      std::cout << "Done : Significance data for video warping\n";
+    } else {
+      std::cout << "Significance data for video warping has been found.\n";
+    }
+
+
+    cv::VideoCapture segmentation_video_capture;
+    segmentation_video_capture.open(segmentation_video_path);
+    size_t frame_count = segmentation_video_capture.get(CV_CAP_PROP_FRAME_COUNT);
+
+    //std::vector<GLMesh> frames_mesh(frame_count);
+    std::vector<Graph<glm::vec2> > frames_graph(frame_count);
+
+    for (size_t t = 0; t < frame_count; ++t) {
+      BuildGridMeshAndGraphForImage(source_video_frames[t], gl_panel_image_mesh, frames_graph[t], grid_size);
+    }
+
+    ObjectPreservingVideoWarping(segmentation_video_path, significance_video_path, frames_graph, target_video_width, target_video_height, grid_size, grid_size);
+
+    ChangeGLPanelSize(target_video_width, target_video_height);
+
+    const std::string result_video_path = source_video_file_directory + "result_" + source_video_file_name + ".avi";
+    cv::VideoWriter result_video_writer;
+    result_video_writer.open(result_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, cv::Size(target_video_width, target_video_height));
+
+    for (size_t t = 0; t < frame_count; ++t) {
+      size_t mesh_column_count = (size_t)(source_video_frames[t].size().width / grid_size) + 1;
+      size_t mesh_row_count = (size_t)(source_video_frames[t].size().height / grid_size) + 1;
+
+      float real_mesh_width = source_video_frames[t].size().width / (float)(mesh_column_count - 1);
+      float real_mesh_height = source_video_frames[t].size().height / (float)(mesh_row_count - 1);
+
+      gl_panel_image_mesh.vertices_.clear();
+
+      for (size_t r = 0; r < mesh_row_count - 1; ++r) {
+        for (size_t c = 0; c < mesh_column_count - 1; ++c) {
+          std::vector<size_t> vertex_indices;
+
+          size_t base_index = r * (mesh_column_count)+c;
+          vertex_indices.push_back(base_index);
+          vertex_indices.push_back(base_index + mesh_column_count);
+          vertex_indices.push_back(base_index + mesh_column_count + 1);
+          vertex_indices.push_back(base_index + 1);
+
+          for (const auto &vertex_index : vertex_indices) {
+            gl_panel_image_mesh.vertices_.push_back(glm::vec3(frames_graph[t].vertices_[vertex_index].x, frames_graph[t].vertices_[vertex_index].y, 0));
+          }
+        }
+      }
+
+      GLTexture::SetGLTexture(source_video_frames[t], &gl_panel_image_mesh.texture_id_);
+      gl_panel_image_mesh.Upload();
+
+      RenderGLPanel();
+
+      std::ostringstream result_frame_name_oss;
+      result_frame_name_oss << "result_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+      //SaveGLScreen(source_video_file_directory + result_frame_name_oss.str());
+
+      result_video_writer.write(GLScreenToMat());
+    }
+  }
+
+  cv::Vec3b GLForm::SaliencyValueToSignifanceColor(double saliency_value) {
+    cv::Vec3b signifance_color(0, 0, 0);
+
+    if (saliency_value > 1) {
+      signifance_color[2] = 1;
+    }
+
+    if (saliency_value < 0) {
+      signifance_color[0] = 1;
+    }
+
+    if (saliency_value < (1 / 3.0)) {
+      signifance_color[1] = (saliency_value * 3.0) * 255;
+      signifance_color[0] = (1 - saliency_value * 3.0) * 255;
+    } else if (saliency_value < (2 / 3.0)) {
+      signifance_color[2] = ((saliency_value - (1 / 3.0)) * 3.0) * 255;
+      signifance_color[1] = 1.0 * 255;
+    } else if (saliency_value <= 1) {
+      signifance_color[2] = 1.0 * 255;
+      signifance_color[1] = (1.0 - (saliency_value - (2 / 3.0)) * 3.0) * 255;
+    }
+
+    return signifance_color;
+  }
+
+  size_t GLForm::Vec3bToValue(const cv::Vec3b &color) {
+    return (size_t)color.val[0] * 256 * 256 + (size_t)color.val[1] * 256 + (size_t)color.val[2];
+  }
+
+  void GLForm::OnButtonsClick(System::Object ^sender, System::EventArgs ^e) {
+    if (sender == open_image_file_tool_strip_menu_item_) {
+      OpenFileDialog ^open_image_file_dialog = gcnew OpenFileDialog();
+      open_image_file_dialog->Filter = "image files|*.*";
+      open_image_file_dialog->Title = "Open an image file.";
+
+      if (open_image_file_dialog->ShowDialog() == System::Windows::Forms::DialogResult::OK) {
+        std::string raw_file_path = msclr::interop::marshal_as<std::string>(open_image_file_dialog->FileName);
+        source_image_file_directory = msclr::interop::marshal_as<std::string>(System::IO::Path::GetDirectoryName(open_image_file_dialog->FileName)) + "\\";
+        source_image_file_name = msclr::interop::marshal_as<std::string>(open_image_file_dialog->SafeFileName);
+
+        source_image = cv::imread(raw_file_path);
+
+        ChangeGLPanelSize(source_image.size().width, source_image.size().height);
+
+        BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, current_grid_size);
+
+        GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
+
+        gl_panel_image_mesh.Upload();
+
+        RenderGLPanel();
+
+        data_for_image_warping_were_generated = false;
+
+        //ChangeProgramStatus(VIEW_OBJ);
+      }
+
+    } else if (sender == open_video_file_tool_strip_menu_item_) {
+      OpenFileDialog ^open_image_file_dialog = gcnew OpenFileDialog();
+      open_image_file_dialog->Filter = "video files|*.*";
+      open_image_file_dialog->Title = "Open a video file.";
+
+      if (open_image_file_dialog->ShowDialog() == System::Windows::Forms::DialogResult::OK) {
+        std::string raw_file_path = msclr::interop::marshal_as<std::string>(open_image_file_dialog->FileName);
+        source_video_file_directory = msclr::interop::marshal_as<std::string>(System::IO::Path::GetDirectoryName(open_image_file_dialog->FileName)) + "\\";
+        source_video_file_name = msclr::interop::marshal_as<std::string>(open_image_file_dialog->SafeFileName);
+
+        cv::VideoCapture video_capture;
+
+        video_capture.open(raw_file_path);
+
+        source_video_fps = video_capture.get(CV_CAP_PROP_FPS);
+        source_video_fourcc = video_capture.get(CV_CAP_PROP_FOURCC);
+
+        source_video_frames.clear();
+
+        cv::Mat video_frame;
+        int frame_count = 0;
+
+        while (video_capture.read(video_frame)) {
+          source_video_frames.push_back(video_frame.clone());
+          ++frame_count;
+        }
+
+        if (source_video_frames.size()) {
+          ContentAwareVideoRetargetingUsingObjectPreservingWarping(source_video_frames[0].size().width * 0.5, source_video_frames[0].size().height * 1, 250);
+        }
+
+        //ChangeProgramStatus(VIEW_OBJ);
+      }
+
+    } else if (sender == save_screen_tool_strip_menu_item_) {
+
+      if (!gl_panel_->Width || !gl_panel_->Height) {
+        std::cout << "GL panel size not correct (<= 0)\n";
+        return;
+      }
+
+      SaveFileDialog ^save_screen_file_dialog = gcnew SaveFileDialog();
+      save_screen_file_dialog->Filter = "jpg|*.jpg|bmp|*.bmp|png|*.png";
+      save_screen_file_dialog->Title = "Save screen as a image file.";
+
+      if (save_screen_file_dialog->ShowDialog() == System::Windows::Forms::DialogResult::OK) {
+        System::IO::Stream^ image_file_stream;
+        if ((image_file_stream = save_screen_file_dialog->OpenFile()) != nullptr && save_screen_file_dialog->FileName != "") {
+          image_file_stream->Close();
+
+          std::string screen_file_path = msclr::interop::marshal_as<std::string>(save_screen_file_dialog->FileName);
+
+          SaveGLScreen(screen_file_path);
+        }
+      }
+    }
+  }
+
+  void GLForm::OnMouseDown(System::Object ^sender, System::Windows::Forms::MouseEventArgs ^e) {
+    if (sender == gl_panel_) {
+      is_dragging_panel = true;
+    }
+  }
+
+  void GLForm::OnMouseUp(System::Object ^sender, System::Windows::Forms::MouseEventArgs ^e) {
+    if (sender == gl_panel_) {
+      if (is_dragging_panel) {
+        is_dragging_panel = false;
+        PatchBasedImageWarpingForContentAwareRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
+      }
+    }
+  }
+
+  void GLForm::OnMouseMove(System::Object ^sender, System::Windows::Forms::MouseEventArgs ^e) {
+    if (sender == gl_panel_) {
+      if (is_dragging_panel) {
+        int new_panel_width = e->X;
+        int new_panel_height = e->Y;
+        ChangeGLPanelSize(new_panel_width, new_panel_height);
+
+        //BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, 10);
+
+        //GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
+
+        //gl_panel_image_mesh.Upload();
+
+        //RenderGLPanel();
+      }
+    }
+  }
+
+  void GLForm::OnKeyDown(System::Object ^sender, System::Windows::Forms::KeyEventArgs ^e) {
+
+    switch (e->KeyCode) {
+    case Keys::Add:
+      --eye_position.z;
+      break;
+    case Keys::Subtract:
+      ++eye_position.z;
+      break;
+    case Keys::Up:
+      ++eye_position.y;
+      ++look_at_position.y;
+      break;
+    case Keys::Down:
+      --eye_position.y;
+      --look_at_position.y;
+      break;
+    case Keys::Left:
+      --eye_position.x;
+      --look_at_position.x;
+      break;
+    case Keys::Right:
+      ++eye_position.x;
+      ++look_at_position.x;
+      break;
+    }
+
+    RenderGLPanel();
+
+    printf("(%.1f %.1f %.1f) (%.1f %.1f %.1f)\n", eye_position.x, eye_position.y, eye_position.z, look_at_position.x, look_at_position.y, look_at_position.z);
+  }
+
+}
