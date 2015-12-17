@@ -11,30 +11,44 @@
 const std::string SEGMENT_TREE_PROGRAM_PATH = "..\\program\\video_segmentation\\seg_tree_sample.exe";
 const std::string SEGMENT_CONVERTER_PROGRAM_PATH = "..\\program\\video_segmentation\\segment_converter.exe";
 
-void SVGToImage() {
+void GroundTruthData() {
+  //for (int i = 1; i <= 132; ++i) {
+  //  std::ostringstream oss;
+  //  oss << "..\\temp\\svg\\source-cut-10-S" << i << ".svg";
+  //  std::string file_name = oss.str();
+  //  std::fstream fs(file_name);
+  //  size_t n;
+  //  fs >> n;
+
+  //  cv::Mat result(cv::Size(688, 286), CV_8UC3);
+
+  //  for (int r = 0; r < 286; ++r) {
+  //    for (int c = 0; c < 688; ++c) {
+  //      fs >> n;
+
+  //      result.at<cv::Vec3b>(r, c).val[0] = n % 256;
+  //      result.at<cv::Vec3b>(r, c).val[1] = (n / 256) % 256;
+  //      result.at<cv::Vec3b>(r, c).val[2] = n / 65536;
+  //    }
+  //  }
+
+  //  std::ostringstream ross;
+  //  ross << "..\\temp\\svg\\segmentation_frame" << std::setw(5) << std::setfill('0') << i - 1 << "_morto.avi.png";
+  //  cv::imwrite(ross.str(), result);
+  //}
+
   for (int i = 1; i <= 132; ++i) {
     std::ostringstream oss;
-    oss << "..\\svg\\source-cut-10-S" << i << ".svg";
-    std::string file_name = oss.str();
-    std::fstream fs(file_name);
-    size_t n;
-    fs >> n;
-
-    cv::Mat result(cv::Size(688, 286), CV_8UC3);
-
-    for (int r = 0; r < 286; ++r) {
-      for (int c = 0; c < 688; ++c) {
-        fs >> n;
-
-        result.at<cv::Vec3b>(r, c).val[0] = n % 256;
-        result.at<cv::Vec3b>(r, c).val[1] = (n / 256) % 256;
-        result.at<cv::Vec3b>(r, c).val[2] = n / 65536;
-      }
-    }
+    oss << "..\\temp\\saliency\\" << i << ".jpg";
+    std::cout << oss.str() << "\n";
+    cv::Mat input;
+    input = cv::imread(oss.str());
+    cv::resize(input, input, cv::Size(688, 286));
 
     std::ostringstream ross;
-    ross << "..\\svg\\segmentation_frame" << std::setw(5) << std::setfill('0') << i - 1 << "_morto.avi.png";
-    cv::imwrite(ross.str(), result);
+    ross << "..\\temp\\saliency\\res\\saliency_frame" << std::setw(5) << std::setfill('0') << i - 1 << "_morto.avi.png";
+    std::cout << ross.str() << "\n";
+    cv::imwrite(ross.str(), input);
   }
 
 }

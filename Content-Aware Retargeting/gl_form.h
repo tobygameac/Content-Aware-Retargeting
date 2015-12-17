@@ -109,7 +109,7 @@ namespace ContentAwareRetargeting {
 
   const float GRID_SIZE_GAP = 10;
 
-  float current_grid_size = 10;
+  float current_grid_size = 4;
 
   float current_focus_grid_scale = 3.5;
 

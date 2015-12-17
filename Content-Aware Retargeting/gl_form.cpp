@@ -20,6 +20,8 @@ namespace ContentAwareRetargeting {
   GLForm::GLForm() {
     InitializeComponent();
 
+    //GroundTruthData();
+
     srand((unsigned)time(0));
 
     InitializeOpenGL();
@@ -208,7 +210,6 @@ namespace ContentAwareRetargeting {
     unsigned char *screen_image_data(new unsigned char[3 * gl_panel_->Width * gl_panel_->Height]);
     glReadBuffer(GL_FRONT);
     glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, screen_image_data);
-
     cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, screen_image_data);
     cv::flip(screen_image, screen_image, 0);
 
@@ -217,16 +218,15 @@ namespace ContentAwareRetargeting {
   }
 
   void GLForm::SaveGLScreen(const std::string &file_path) {
-    unsigned char *screen_image_data(new unsigned char[3 * gl_panel_->Width * gl_panel_->Height]);
-    glReadBuffer(GL_FRONT);
-    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, screen_image_data);
+    std::vector<unsigned char> screen_image_data(3 * gl_panel_->Width * gl_panel_->Height);
 
-    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, screen_image_data);
+    glReadBuffer(GL_FRONT);
+    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, &screen_image_data[0]);
+
+    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, &screen_image_data[0]);
     cv::flip(screen_image, screen_image, 0);
     cv::imwrite(file_path, screen_image);
     std::cout << "Screen saved : " << file_path << "\n";
-
-    delete screen_image_data;
   }
 
   void GLForm::ChangeGLPanelSize(int new_panel_width, int new_panel_height) {
@@ -326,7 +326,7 @@ namespace ContentAwareRetargeting {
       saliency_map_of_source_image = CalculateContextAwareSaliencyMapWithMatlabProgram(source_image, saliency_map, source_image_file_directory + source_image_file_name, source_image_file_directory + "saliency_" + source_image_file_name);
 
       // Calculate the saliency value of each patch
-      for (int r = 0; r < source_image.size().height; ++r) {
+      for (size_t r = 0; r < source_image.size().height; ++r) {
         saliency_map[r].push_back(saliency_map[r].back());
         group_of_pixel[r].push_back(group_of_pixel[r].back());
       }
@@ -357,8 +357,8 @@ namespace ContentAwareRetargeting {
       }
 
       significance_map_of_source_image = cv::Mat(source_image.size(), source_image.type());
-      for (int r = 0; r < source_image.size().height; ++r) {
-        for (int c = 0; c < source_image.size().width; ++c) {
+      for (size_t r = 0; r < source_image.size().height; ++r) {
+        for (size_t c = 0; c < source_image.size().width; ++c) {
           double vertex_saliency = saliency_of_patch[group_of_pixel[r][c]];
           significance_map_of_source_image.at<cv::Vec3b>(r, c) = SaliencyValueToSignifanceColor(vertex_saliency);
         }
@@ -487,9 +487,12 @@ namespace ContentAwareRetargeting {
         }
       }
 
+      segmentation_video_writer.release();
+      saliency_video_writer.release();
+
       std::cout << "Segmented frames and saliency frames are loaded.\n";
 
-      std::vector<std::vector<std::vector<int> > > group_of_pixel;
+      //std::vector<std::vector<std::vector<int> > > group_of_pixel;
       //size_t real_group_count = CalculateGroupFromSegmentedVideo(source_video_frames_after_segmentation, group_of_pixel);
       //std::cout << "Real Group count : " << real_group_count << "\n";
       std::cout << "Group count : " << saliency_of_object.size() << "\n";
@@ -529,19 +532,19 @@ namespace ContentAwareRetargeting {
       //  color.val[2] = rand() % 256;
       //}
 
-      min_saliency = 2e9;
-      max_saliency = -2e9;
-      for (size_t t = 0; t < source_video_frames_after_segmentation.size(); ++t) {
-        std::ostringstream video_frame_saliency_name_oss;
-        video_frame_saliency_name_oss << "saliency_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
-        cv::Mat saliency_frame = cv::imread(source_video_file_directory + video_frame_saliency_name_oss.str());
-        for (size_t r = 0; r < source_video_frames_after_segmentation[t].size().height; ++r) {
-          for (size_t c = 0; c < source_video_frames_after_segmentation[t].size().width; ++c) {
-            //++real_object_size[group_of_pixel[t][r][c]];
-            //real_saliency_of_object[group_of_pixel[t][r][c]] += saliency_frame.at<cv::Vec3b>(r, c).val[0] / 255.0;
-          }
-        }
-      }
+      //min_saliency = 2e9;
+      //max_saliency = -2e9;
+      //for (size_t t = 0; t < source_video_frames_after_segmentation.size(); ++t) {
+      //  std::ostringstream video_frame_saliency_name_oss;
+      //  video_frame_saliency_name_oss << "saliency_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+      //  cv::Mat saliency_frame = cv::imread(source_video_file_directory + video_frame_saliency_name_oss.str());
+      //  for (size_t r = 0; r < source_video_frames_after_segmentation[t].size().height; ++r) {
+      //    for (size_t c = 0; c < source_video_frames_after_segmentation[t].size().width; ++c) {
+      //      ++real_object_size[group_of_pixel[t][r][c]];
+      //      real_saliency_of_object[group_of_pixel[t][r][c]] += saliency_frame.at<cv::Vec3b>(r, c).val[0] / 255.0;
+      //    }
+      //  }
+      //}
 
       //for (size_t t = 0; t < real_object_size.size(); ++t) {
       //  if (real_object_size[t]) {
@@ -554,17 +557,18 @@ namespace ContentAwareRetargeting {
       cv::VideoWriter significance_video_writer;
       significance_video_writer.open(significance_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, source_video_frames[0].size());
 
-      cv::VideoCapture segmentation_video_capture;
-      segmentation_video_capture.open(segmentation_video_path);
+      for (size_t t = 0; t < source_video_frames.size(); ++t) {
 
-      cv::Mat segmentation_video_frame;
+        std::ostringstream video_frame_segmentation_name_oss;
+        video_frame_segmentation_name_oss << "segmentation_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+        
+        if (!std::fstream(source_video_file_directory + video_frame_segmentation_name_oss.str()).good()) {
+          break;
+        }
+        
+        cv::Mat segmentation_video_frame = cv::imread(source_video_file_directory + video_frame_segmentation_name_oss.str());
 
-      size_t t = 0;
-      while (segmentation_video_capture.read(segmentation_video_frame)) {
-        std::ostringstream video_frame_significance_name_oss;
-        video_frame_significance_name_oss << "significance_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
-
-        cv::Mat significance_frame = source_video_frames_after_segmentation[t];
+        cv::Mat significance_frame = segmentation_video_frame.clone();
         for (size_t r = 0; r < significance_frame.size().height; ++r) {
           for (size_t c = 0; c < significance_frame.size().width; ++c) {
             size_t pixel_group = Vec3bToValue(significance_frame.at<cv::Vec3b>(r, c));
@@ -578,7 +582,11 @@ namespace ContentAwareRetargeting {
             ////significance_frame.at<cv::Vec3b>(r, c) = real_object_color[pixel_group];
           }
         }
+
+        std::ostringstream video_frame_significance_name_oss;
+        video_frame_significance_name_oss << "significance_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
         cv::imwrite(source_video_file_directory + video_frame_significance_name_oss.str(), significance_frame);
+
         significance_video_writer.write(significance_frame);
       }
 
@@ -586,7 +594,6 @@ namespace ContentAwareRetargeting {
     } else {
       std::cout << "Significance data for video warping has been found.\n";
     }
-
 
     cv::VideoCapture segmentation_video_capture;
     segmentation_video_capture.open(segmentation_video_path);
@@ -599,7 +606,7 @@ namespace ContentAwareRetargeting {
       BuildGridMeshAndGraphForImage(source_video_frames[t], gl_panel_image_mesh, frames_graph[t], grid_size);
     }
 
-    ObjectPreservingVideoWarping(segmentation_video_path, significance_video_path, frames_graph, target_video_width, target_video_height, grid_size, grid_size);
+    ObjectPreservingVideoWarping(source_video_file_directory, source_video_file_name, frames_graph, target_video_width, target_video_height, grid_size, grid_size);
 
     ChangeGLPanelSize(target_video_width, target_video_height);
 
@@ -730,7 +737,7 @@ namespace ContentAwareRetargeting {
         }
 
         if (source_video_frames.size()) {
-          ContentAwareVideoRetargetingUsingObjectPreservingWarping(source_video_frames[0].size().width * 0.5, source_video_frames[0].size().height * 1, 250);
+          ContentAwareVideoRetargetingUsingObjectPreservingWarping(source_video_frames[0].size().width * 0.5, source_video_frames[0].size().height * 1, current_grid_size);
         }
 
         //ChangeProgramStatus(VIEW_OBJ);

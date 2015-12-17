@@ -30,14 +30,9 @@ double SignifanceColorToSaliencyValue(cv::Vec3b &signifance_color) {
   return (signifance_color[1] / 255.0) / 3.0;
 }
 
-void ObjectPreservingVideoWarping(const std::string &segmentation_video_path, const std::string &significance_video_path, std::vector<Graph<glm::vec2> > &target_graphs, int target_video_width, const int target_video_height, const double mesh_width, const double mesh_height) {
+void ObjectPreservingVideoWarping(const std::string &source_video_file_directory, const std::string &source_video_file_name, std::vector<Graph<glm::vec2> > &target_graphs, int target_video_width, const int target_video_height, const double mesh_width, const double mesh_height) {
   if (target_video_width <= 0 || target_video_height <= 0) {
     printf("Wrong target video size (%d x %d)\n", target_video_width, target_video_height);
-    return;
-  }
-
-  if (!std::fstream(significance_video_path).good()) {
-    std::cout << "Significance video file not found.\n";
     return;
   }
 
@@ -46,7 +41,7 @@ void ObjectPreservingVideoWarping(const std::string &segmentation_video_path, co
   const double ORIENTATION_WEIGHT = 12.0;
 
   const double OBJECT_COHERENCE_WEIGHT = 4.0;
-  const double LINE_COHERENCE_WEIGHT = 12.0;
+  const double LINE_COHERENCE_WEIGHT = 2.0;
 
   //const double DST_WEIGHT = 0.7;
   //const double DLT_WEIGHT = 0.3;
@@ -59,21 +54,25 @@ void ObjectPreservingVideoWarping(const std::string &segmentation_video_path, co
   std::map<size_t, Edge> object_representive_edge;
   std::map<size_t, glm::vec2> object_mesh_average_deformation_in_first_appear_frame;
 
-  cv::VideoCapture segmentation_video_capture;
-  segmentation_video_capture.open(segmentation_video_path);
-  cv::VideoCapture significance_video_capture;
-  significance_video_capture.open(significance_video_path);
-
   for (size_t t = 0; t < target_graphs.size(); ++t) {
-    cv::Mat segmentation_video_frame;
-    if (!segmentation_video_capture.read(segmentation_video_frame)) {
+
+    std::ostringstream video_frame_segmentation_name_oss;
+    video_frame_segmentation_name_oss << "segmentation_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+
+    std::ostringstream video_frame_significance_name_oss;
+    video_frame_significance_name_oss << "significance_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
+
+    if (!std::fstream(source_video_file_directory + video_frame_segmentation_name_oss.str()).good()) {
       break;
     }
 
-    cv::Mat significance_video_frame;
-    if (!significance_video_capture.read(significance_video_frame)) {
+    if (!std::fstream(source_video_file_directory + video_frame_significance_name_oss.str()).good()) {
       break;
     }
+
+    cv::Mat segmentation_video_frame = cv::imread(source_video_file_directory + video_frame_segmentation_name_oss.str());
+
+    cv::Mat significance_video_frame = cv::imread(source_video_file_directory + video_frame_significance_name_oss.str());
 
     const double WIDTH_RATIO = target_video_width / (double)segmentation_video_frame.size().width;
     const double HEIGHT_RATIO = target_video_height / (double)segmentation_video_frame.size().height;
@@ -162,8 +161,13 @@ void ObjectPreservingVideoWarping(const std::string &segmentation_video_path, co
         object_representive_edge[group_1] = target_graph.edges_[edge_index];
       } else { // Average deformation
         const glm::vec2 &average_deformation = object_mesh_average_deformation_in_first_appear_frame[group_1];
-        expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
-        expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
+        float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
+        float delta_y = target_graph.vertices_[vertex_index_1].y - target_graph.vertices_[vertex_index_2].y;
+        if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
+          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
+        } else {
+          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
+        }
       }
 
       if (group_1 != group_2) {
@@ -179,8 +183,13 @@ void ObjectPreservingVideoWarping(const std::string &segmentation_video_path, co
           object_representive_edge[group_2] = target_graph.edges_[edge_index];
         } else { // Average deformation
           const glm::vec2 &average_deformation = object_mesh_average_deformation_in_first_appear_frame[group_2];
-          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
-          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
+          float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
+          float delta_y = target_graph.vertices_[vertex_index_1].y - target_graph.vertices_[vertex_index_2].y;
+          if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
+            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
+          } else {
+            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
+          }
         }
       }
     }
@@ -272,7 +281,7 @@ void ObjectPreservingVideoWarping(const std::string &segmentation_video_path, co
     if (!cplex.solve()) {
       std::cout << "Failed to optimize the model. (frame : " << t << ")\n";
     } else {
-      //std::cout << "Done. (frame : " << t << ")\n";
+      std::cout << "Done. (frame : " << t << " / " << target_graphs.size() << ")\n";
     }
 
     IloNumArray result(env);
@@ -323,324 +332,6 @@ void ObjectPreservingVideoWarping(const std::string &segmentation_video_path, co
   }
 
   std::cout << "Optimization done.\n";
-}
-
-void GlobalObjectPreservingVideoWarping(const std::string &segmentation_video_path, const std::string &significance_video_path, std::vector<Graph<glm::vec2> > &target_graphs, int target_video_width, const int target_video_height, const double mesh_width, const double mesh_height) {
-  if (target_video_width <= 0 || target_video_height <= 0) {
-    printf("Wrong target video size (%d x %d)\n", target_video_width, target_video_height);
-    return;
-  }
-
-  if (!std::fstream(significance_video_path).good()) {
-    std::cout << "Significance video file not found.\n";
-    return;
-  }
-
-  const double DST_WEIGHT = 5.5;
-  const double DLT_WEIGHT = 0.8;
-  const double ORIENTATION_WEIGHT = 12.0;
-
-  const double OBJECT_COHERENCE_WEIGHT = 4.0;
-  const double LINE_COHERENCE_WEIGHT = 2.0;
-
-  IloEnv env;
-
-  IloNumVarArray x(env);
-  IloExpr expr(env);
-
-  IloRangeArray hard_constraint(env);
-
-  for (size_t t = 0; t < target_graphs.size(); ++t) {
-    for (size_t vertex_index = 0; vertex_index < target_graphs[t].vertices_.size(); ++vertex_index) {
-      x.add(IloNumVar(env, -IloInfinity, IloInfinity));
-      x.add(IloNumVar(env, -IloInfinity, IloInfinity));
-    }
-  }
-
-  cv::VideoCapture segmentation_video_capture;
-  segmentation_video_capture.open(segmentation_video_path);
-  cv::VideoCapture significance_video_capture;
-  significance_video_capture.open(significance_video_path);
-
-  // Line coherence
-  for (size_t t = 1; t < target_graphs.size(); ++t) {
-    size_t variable_index_offset = t * target_graphs[t].vertices_.size() * 2;
-    for (size_t vertex_index = 0; vertex_index < target_graphs[t].vertices_.size(); ++vertex_index) {
-      expr += LINE_COHERENCE_WEIGHT * IloPower(x[vertex_index * 2 + variable_index_offset] - x[vertex_index * 2 - target_graphs[t].vertices_.size() * 2 + variable_index_offset], 2.0);
-      expr += LINE_COHERENCE_WEIGHT * IloPower(x[vertex_index * 2 + 1 + variable_index_offset] - x[vertex_index * 2 + 1 - target_graphs[t].vertices_.size() * 2 + variable_index_offset], 2.0);
-    }
-  }
-
-  std::map<size_t, Edge> object_representive_edge;
-  std::map<size_t, double> object_saliency;
-
-  struct VariableEdgeIndices {
-    size_t x1, y1, x2, y2;
-    bool is_horizontal;
-  };
-
-  std::map<size_t, std::vector<VariableEdgeIndices> > edge_variable_index_list_of_object_in_first_appear_frame;
-
-  for (size_t t = 0; t < target_graphs.size(); ++t) {
-
-    cv::Mat segmentation_video_frame;
-    if (!segmentation_video_capture.read(segmentation_video_frame)) {
-      break;
-    }
-
-    cv::Mat significance_video_frame;
-    if (!significance_video_capture.read(significance_video_frame)) {
-      break;
-    }
-
-    Graph<glm::vec2> &target_graph = target_graphs[t];
-
-    const double WIDTH_RATIO = target_video_width / (double)segmentation_video_frame.size().width;
-    const double HEIGHT_RATIO = target_video_height / (double)segmentation_video_frame.size().height;
-
-    size_t mesh_column_count = (size_t)(segmentation_video_frame.size().width / mesh_width) + 1;
-    size_t mesh_row_count = (size_t)(segmentation_video_frame.size().height / mesh_height) + 1;
-
-    size_t variable_index_offset = t * target_graph.vertices_.size() * 2;
-
-    // Boundary constraint
-    for (size_t row = 0; row < mesh_row_count; ++row) {
-      size_t vertex_index = row * mesh_column_count;
-      hard_constraint.add(x[vertex_index * 2 + variable_index_offset] == target_graph.vertices_[0].x);
-
-      vertex_index = row * mesh_column_count + mesh_column_count - 1;
-      hard_constraint.add(x[vertex_index * 2 + variable_index_offset] == target_video_width);
-    }
-
-    for (size_t column = 0; column < mesh_column_count; ++column) {
-      size_t vertex_index = column;
-      hard_constraint.add(x[vertex_index * 2 + 1 + variable_index_offset] == target_graph.vertices_[0].y);
-
-      vertex_index = (mesh_row_count - 1) * mesh_column_count + column;
-      hard_constraint.add(x[vertex_index * 2 + 1 + variable_index_offset] == target_video_height);
-    }
-
-    // Avoid flipping
-    for (size_t row = 0; row < mesh_row_count; ++row) {
-      for (size_t column = 1; column < mesh_column_count; ++column) {
-        size_t vertex_index_right = row * mesh_column_count + column;
-        size_t vertex_index_left = row * mesh_column_count + column - 1;
-        //hard_constraint.add((x[vertex_index_right * 2 + variable_index_offset] - x[vertex_index_left * 2 + variable_index_offset]) >= 1e-4);
-      }
-    }
-
-    for (size_t row = 1; row < mesh_row_count; ++row) {
-      for (size_t column = 0; column < mesh_column_count; ++column) {
-        size_t vertex_index_down = row * mesh_column_count + column;
-        size_t vertex_index_up = (row - 1) * mesh_column_count + column;
-        //hard_constraint.add((x[vertex_index_down * 2 + 1 + variable_index_offset] - x[vertex_index_up * 2 + 1 + variable_index_offset]) >= 1e-4);
-      }
-    }
-
-    // For the boundary pixel
-    cv::resize(segmentation_video_frame, segmentation_video_frame, segmentation_video_frame.size() + cv::Size(1, 1));
-    cv::resize(significance_video_frame, significance_video_frame, significance_video_frame.size() + cv::Size(1, 1));
-
-    std::map<size_t, std::vector<size_t> > edge_index_list_of_object;
-
-    for (size_t edge_index = 0; edge_index < target_graph.edges_.size(); ++edge_index) {
-      size_t vertex_index1 = target_graph.edges_[edge_index].edge_indices_pair_.first;
-      size_t vertex_index2 = target_graph.edges_[edge_index].edge_indices_pair_.second;
-      size_t group_of_x = Vec3bToValue(segmentation_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index1].y, target_graph.vertices_[vertex_index1].x));
-      size_t group_of_y = Vec3bToValue(segmentation_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index2].y, target_graph.vertices_[vertex_index2].x));
-      if (group_of_x == group_of_y) {
-        edge_index_list_of_object[group_of_x].push_back(edge_index);
-      } else {
-        edge_index_list_of_object[group_of_x].push_back(edge_index);
-        edge_index_list_of_object[group_of_y].push_back(edge_index);
-      }
-
-      if (object_representive_edge.find(group_of_x) == object_representive_edge.end()) {
-        object_representive_edge[group_of_x] = target_graph.edges_[edge_index];
-
-        object_saliency[group_of_x] = SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[object_representive_edge[group_of_x].edge_indices_pair_.first].y, target_graph.vertices_[object_representive_edge[group_of_x].edge_indices_pair_.first].x));
-        object_saliency[group_of_x] += SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[object_representive_edge[group_of_x].edge_indices_pair_.second].y, target_graph.vertices_[object_representive_edge[group_of_x].edge_indices_pair_.second].x));
-        object_saliency[group_of_x] /= 2.0;
-      }
-
-      if (object_representive_edge.find(group_of_y) == object_representive_edge.end()) {
-        object_representive_edge[group_of_y] = target_graph.edges_[edge_index];
-
-        object_saliency[group_of_y] = SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[object_representive_edge[group_of_y].edge_indices_pair_.first].y, target_graph.vertices_[object_representive_edge[group_of_y].edge_indices_pair_.first].x));
-        object_saliency[group_of_y] += SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[object_representive_edge[group_of_y].edge_indices_pair_.second].y, target_graph.vertices_[object_representive_edge[group_of_y].edge_indices_pair_.second].x));
-        object_saliency[group_of_y] /= 2.0;
-      }
-    }
-
-    // Average deformation
-    for (auto edge_index_list_of_object_iterator = edge_index_list_of_object.begin(); edge_index_list_of_object_iterator != edge_index_list_of_object.end(); ++edge_index_list_of_object_iterator) {
-      std::size_t object_index = edge_index_list_of_object_iterator->first;
-      const std::vector<size_t> &edge_index_list = edge_index_list_of_object_iterator->second;
-
-      if (edge_variable_index_list_of_object_in_first_appear_frame.find(object_index) == edge_variable_index_list_of_object_in_first_appear_frame.end()) {
-        for (const auto &edge_index : edge_index_list) {
-          const Edge &edge = target_graph.edges_[edge_index];
-
-          size_t vertex_index1 = edge.edge_indices_pair_.first;
-          size_t vertex_index2 = edge.edge_indices_pair_.second;
-
-          VariableEdgeIndices variable_edge_indices;
-          variable_edge_indices.x1 = vertex_index1 * 2 + variable_index_offset;
-          variable_edge_indices.y1 = vertex_index1 * 2 + 1 + variable_index_offset;
-
-          variable_edge_indices.x2 = vertex_index2 * 2 + variable_index_offset;
-          variable_edge_indices.y2 = vertex_index2 * 2 + 1 + variable_index_offset;
-
-          float delta_x = target_graph.vertices_[vertex_index1].x - target_graph.vertices_[vertex_index2].x;
-          float delta_y = target_graph.vertices_[vertex_index1].y - target_graph.vertices_[vertex_index2].y;
-          variable_edge_indices.is_horizontal = std::abs(delta_x) > std::abs(delta_y);
-
-          edge_variable_index_list_of_object_in_first_appear_frame[object_index].push_back(variable_edge_indices);
-        }
-      }
-    }
-
-    for (auto edge_index_list_of_object_iterator = edge_index_list_of_object.begin(); edge_index_list_of_object_iterator != edge_index_list_of_object.end(); ++edge_index_list_of_object_iterator) {
-      std::size_t object_index = edge_index_list_of_object_iterator->first;
-      const std::vector<size_t> &edge_index_list = edge_index_list_of_object_iterator->second;
-
-      for (const auto &edge_index : edge_index_list) {
-        const Edge &edge = target_graph.edges_[edge_index];
-
-        size_t vertex_index1 = edge.edge_indices_pair_.first;
-        size_t vertex_index2 = edge.edge_indices_pair_.second;
-
-        float delta_x = target_graph.vertices_[vertex_index1].x - target_graph.vertices_[vertex_index2].x;
-        float delta_y = target_graph.vertices_[vertex_index1].y - target_graph.vertices_[vertex_index2].y;
-        bool is_horizontal = std::abs(delta_x) > std::abs(delta_y);
-
-        size_t edge_count = edge_variable_index_list_of_object_in_first_appear_frame[object_index].size();
-
-        for (const VariableEdgeIndices &variable_edge_indices : edge_variable_index_list_of_object_in_first_appear_frame[object_index]) {
-          if (is_horizontal == variable_edge_indices.is_horizontal) {
-            expr += OBJECT_COHERENCE_WEIGHT * 1.0 / edge_count * IloPower((x[vertex_index2 * 2 + variable_index_offset] - x[vertex_index1 * 2 + variable_index_offset]) - (x[variable_edge_indices.x2] - x[variable_edge_indices.x1]), 2.0);
-            expr += OBJECT_COHERENCE_WEIGHT * 1.0 / edge_count * IloPower((x[vertex_index2 * 2 + 1 + variable_index_offset] - x[vertex_index1 * 2 + 1 + variable_index_offset]) - (x[variable_edge_indices.y2] - x[variable_edge_indices.y1]), 2.0);
-          }
-        }
-      }
-    }
-
-    // Object transformation constraint
-    for (auto edge_index_list_of_object_iterator = edge_index_list_of_object.begin(); edge_index_list_of_object_iterator != edge_index_list_of_object.end(); ++edge_index_list_of_object_iterator) {
-
-      std::size_t object_index = edge_index_list_of_object_iterator->first;
-      const std::vector<size_t> &edge_index_list = edge_index_list_of_object_iterator->second;
-
-      if (!edge_index_list.size()) {
-        continue;
-      }
-
-      // Not global representive edge for each object
-      //Edge representive_edge = target_graph.edges_[edge_index_list[0]];
-      const Edge &representive_edge = object_representive_edge[object_index];
-
-      double c_x = target_graph.vertices_[representive_edge.edge_indices_pair_.first].x - target_graph.vertices_[representive_edge.edge_indices_pair_.second].x;
-      double c_y = target_graph.vertices_[representive_edge.edge_indices_pair_.first].y - target_graph.vertices_[representive_edge.edge_indices_pair_.second].y;
-
-      double saliency_of_object = object_saliency[object_index];
-
-      double original_matrix_a = c_x;
-      double original_matrix_b = c_y;
-      double original_matrix_c = c_y;
-      double original_matrix_d = -c_x;
-
-      double matrix_rank = original_matrix_a * original_matrix_d - original_matrix_b * original_matrix_c;
-
-      if (fabs(matrix_rank) <= 1e-9) {
-        matrix_rank = (matrix_rank > 0 ? 1 : -1) * 1e-9;
-      }
-
-      double matrix_a = original_matrix_d / matrix_rank;
-      double matrix_b = -original_matrix_b / matrix_rank;
-      double matrix_c = -original_matrix_c / matrix_rank;
-      double matrix_d = original_matrix_a / matrix_rank;
-
-      for (const auto &edge_index : edge_index_list) {
-        const Edge &edge = target_graph.edges_[edge_index];
-        double e_x = target_graph.vertices_[edge.edge_indices_pair_.first].x - target_graph.vertices_[edge.edge_indices_pair_.second].x;
-        double e_y = target_graph.vertices_[edge.edge_indices_pair_.first].y - target_graph.vertices_[edge.edge_indices_pair_.second].y;
-
-        double t_s = matrix_a * e_x + matrix_b * e_y;
-        double t_r = matrix_c * e_x + matrix_d * e_y;
-
-        // DST
-        expr += DST_WEIGHT * saliency_of_object *
-          IloPower((x[edge.edge_indices_pair_.first * 2 + variable_index_offset] - x[edge.edge_indices_pair_.second * 2 + variable_index_offset]) -
-            (t_s * (x[representive_edge.edge_indices_pair_.first * 2 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + variable_index_offset]) + t_r * (x[representive_edge.edge_indices_pair_.first * 2 + 1 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + 1 + variable_index_offset])),
-            2);
-        expr += DST_WEIGHT * saliency_of_object *
-          IloPower((x[edge.edge_indices_pair_.first * 2 + 1 + variable_index_offset] - x[edge.edge_indices_pair_.second * 2 + 1 + variable_index_offset]) -
-            (-t_r * (x[representive_edge.edge_indices_pair_.first * 2 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + variable_index_offset]) + t_s * (x[representive_edge.edge_indices_pair_.first * 2 + 1 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + 1 + variable_index_offset])),
-            2);
-
-        // DLT
-        expr += DLT_WEIGHT * (1 - saliency_of_object) *
-          IloPower((x[edge.edge_indices_pair_.first * 2 + variable_index_offset] - x[edge.edge_indices_pair_.second * 2 + variable_index_offset]) -
-            WIDTH_RATIO * (t_s * (x[representive_edge.edge_indices_pair_.first * 2 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + variable_index_offset]) + t_r * (x[representive_edge.edge_indices_pair_.first * 2 + 1 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + 1 + variable_index_offset])),
-            2);
-        expr += DLT_WEIGHT * (1 - saliency_of_object) *
-          IloPower((x[edge.edge_indices_pair_.first * 2 + 1 + variable_index_offset] - x[edge.edge_indices_pair_.second * 2 + 1 + variable_index_offset]) -
-            HEIGHT_RATIO * (-t_r *  (x[representive_edge.edge_indices_pair_.first * 2 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + variable_index_offset]) + t_s * (x[representive_edge.edge_indices_pair_.first * 2 + 1 + variable_index_offset] - x[representive_edge.edge_indices_pair_.second * 2 + 1 + variable_index_offset])),
-            2);
-      }
-    }
-
-    // Grid orientation constraint
-    for (const auto &edge : target_graph.edges_) {
-      size_t vertex_index_1 = edge.edge_indices_pair_.first;
-      size_t vertex_index_2 = edge.edge_indices_pair_.second;
-      float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
-      float delta_y = target_graph.vertices_[vertex_index_1].y - target_graph.vertices_[vertex_index_2].y;
-      if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
-        expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2 + 1 + variable_index_offset] - x[vertex_index_2 * 2 + 1 + variable_index_offset], 2);
-      } else {
-        expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2 + variable_index_offset] - x[vertex_index_2 * 2 + variable_index_offset], 2);
-      }
-    }
-  }
-
-  IloModel model(env);
-
-  model.add(IloMinimize(env, expr));
-
-  model.add(hard_constraint);
-
-  IloCplex cplex(model);
-
-  //cplex.setOut(env.getNullStream());
-
-  if (!cplex.solve()) {
-    puts("Failed to optimize the model.");
-  }
-
-  std::cout << "Done.\n";
-
-  IloNumArray result(env);
-
-  //cplex.getValues(result, x);
-
-  for (size_t t = 0; t < target_graphs.size(); ++t) {
-    Graph<glm::vec2> &target_graph = target_graphs[t];
-    size_t variable_index_offset = t * target_graph.vertices_.size() * 2;
-    for (size_t vertex_index = 0; vertex_index < target_graph.vertices_.size(); ++vertex_index) {
-      //target_graph.vertices_[vertex_index].x = result[vertex_index * 2 + variable_index_offset];
-      //target_graph.vertices_[vertex_index].y = result[vertex_index * 2 + 1 + variable_index_offset];
-
-      //std::cout << t << " : (" << target_graph.vertices_[vertex_index].x << ", " << target_graph.vertices_[vertex_index].y << ") -> (" << cplex.getValue(x[vertex_index * 2 + variable_index_offset]) << ", " << cplex.getValue(x[vertex_index * 2 + 1 + variable_index_offset]) << ")\n";
-
-      target_graph.vertices_[vertex_index].x = cplex.getValue(x[vertex_index * 2 + variable_index_offset]);
-      target_graph.vertices_[vertex_index].y = cplex.getValue(x[vertex_index * 2 + 1 + variable_index_offset]);
-    }
-  }
-
-  model.end();
-  cplex.end();
-  env.end();
 }
 
 void PatchBasedWarping(const cv::Mat &image, Graph<glm::vec2> &target_graph, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<double> &saliency_of_patch, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height) {
