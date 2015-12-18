@@ -36,7 +36,9 @@
 namespace ContentAwareRetargeting {
 
   enum ProgramStatus {
-    VIEWING_RESULT,
+    IDLE,
+    IMAGE_RETARGETING,
+    VIDEO_RETARGETING
   };
 
   ProgramStatus program_status;
@@ -104,12 +106,7 @@ namespace ContentAwareRetargeting {
   const float GRID_LINE_WIDTH = 4.5;
   const float GRID_POINT_SIZE = 7.5;
 
-  const float MIN_GRID_SIZE = 10;
-  const float MAX_GRID_SIZE = 120;
-
-  const float GRID_SIZE_GAP = 10;
-
-  float current_grid_size = 4;
+  float current_grid_size = 20;
 
   float current_focus_grid_scale = 3.5;
 
@@ -161,6 +158,8 @@ namespace ContentAwareRetargeting {
 
     void RenderGLPanel();
 
+    void ChangeProgramStatus(const ProgramStatus &new_program_status);
+
     cv::Mat GLScreenToMat();
 
     void SaveGLScreen(const std::string &file_path);
@@ -169,7 +168,7 @@ namespace ContentAwareRetargeting {
 
     void BuildGridMeshAndGraphForImage(const cv::Mat &image, GLMesh &target_mesh, Graph<glm::vec2> &G, float grid_size);
 
-    void ContentAwareRetargeting(const int target_image_width, const int target_image_height, const float grid_size);
+    void ContentAwareImageRetargeting(const int target_image_width, const int target_image_height, const float grid_size);
 
     void ContentAwareVideoRetargetingUsingObjectPreservingWarping(const int target_video_width, const int target_video_height, const float grid_size);
 
@@ -186,6 +185,8 @@ namespace ContentAwareRetargeting {
     void OnMouseMove(System::Object ^sender, System::Windows::Forms::MouseEventArgs ^e);
 
     void OnKeyDown(System::Object ^sender, System::Windows::Forms::KeyEventArgs ^e);
+
+    void OnTrackBarsValueChanged(System::Object ^sender, System::EventArgs ^e);
 
   protected:
     /// <summary>
@@ -209,6 +210,11 @@ namespace ContentAwareRetargeting {
     System::Windows::Forms::ToolStripMenuItem ^open_video_file_tool_strip_menu_item_;
     System::Windows::Forms::ToolStripMenuItem ^save_screen_tool_strip_menu_item_;
     System::Windows::Forms::ToolStripMenuItem ^record_screen_tool_strip_menu_item_;
+    System::Windows::Forms::TrackBar ^grid_size_track_bar_;
+    System::Windows::Forms::Label ^grid_size_label_;
+    System::Windows::Forms::Label ^original_size_label_;
+    System::Windows::Forms::Label ^target_size_label_;
+    System::Windows::Forms::Button ^start_button_;
 
 
 #pragma region Windows Form Designer generated code
@@ -221,21 +227,27 @@ namespace ContentAwareRetargeting {
       this->menu_strip_ = (gcnew System::Windows::Forms::MenuStrip());
       this->file_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
       this->open_image_file_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
+      this->open_video_file_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
       this->save_screen_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
       this->record_screen_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
       this->mode_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
       this->view_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
-      this->open_video_file_tool_strip_menu_item_ = (gcnew System::Windows::Forms::ToolStripMenuItem());
+      this->grid_size_track_bar_ = (gcnew System::Windows::Forms::TrackBar());
+      this->grid_size_label_ = (gcnew System::Windows::Forms::Label());
+      this->original_size_label_ = (gcnew System::Windows::Forms::Label());
+      this->target_size_label_ = (gcnew System::Windows::Forms::Label());
+      this->start_button_ = (gcnew System::Windows::Forms::Button());
       this->menu_strip_->SuspendLayout();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->grid_size_track_bar_))->BeginInit();
       this->SuspendLayout();
       // 
       // gl_panel_
       // 
       this->gl_panel_->BorderStyle = System::Windows::Forms::BorderStyle::Fixed3D;
       this->gl_panel_->Cursor = System::Windows::Forms::Cursors::Default;
-      this->gl_panel_->Location = System::Drawing::Point(20, 20);
+      this->gl_panel_->Location = System::Drawing::Point(200, 50);
       this->gl_panel_->Name = L"gl_panel_";
-      this->gl_panel_->Size = System::Drawing::Size(1024, 768);
+      this->gl_panel_->Size = System::Drawing::Size(800, 600);
       this->gl_panel_->TabIndex = 0;
       // 
       // menu_strip_
@@ -246,7 +258,7 @@ namespace ContentAwareRetargeting {
       });
       this->menu_strip_->Location = System::Drawing::Point(0, 0);
       this->menu_strip_->Name = L"menu_strip_";
-      this->menu_strip_->Size = System::Drawing::Size(1264, 24);
+      this->menu_strip_->Size = System::Drawing::Size(1084, 24);
       this->menu_strip_->TabIndex = 1;
       this->menu_strip_->Text = L"menuStrip1";
       // 
@@ -265,6 +277,12 @@ namespace ContentAwareRetargeting {
       this->open_image_file_tool_strip_menu_item_->Name = L"open_image_file_tool_strip_menu_item_";
       this->open_image_file_tool_strip_menu_item_->Size = System::Drawing::Size(160, 22);
       this->open_image_file_tool_strip_menu_item_->Text = L"Open Image File";
+      // 
+      // open_video_file_tool_strip_menu_item_
+      // 
+      this->open_video_file_tool_strip_menu_item_->Name = L"open_video_file_tool_strip_menu_item_";
+      this->open_video_file_tool_strip_menu_item_->Size = System::Drawing::Size(160, 22);
+      this->open_video_file_tool_strip_menu_item_->Text = L"Open Video File";
       // 
       // save_screen_tool_strip_menu_item_
       // 
@@ -290,17 +308,63 @@ namespace ContentAwareRetargeting {
       this->view_tool_strip_menu_item_->Size = System::Drawing::Size(44, 20);
       this->view_tool_strip_menu_item_->Text = L"View";
       // 
-      // open_video_file_tool_strip_menu_item_
+      // grid_size_track_bar_
       // 
-      this->open_video_file_tool_strip_menu_item_->Name = L"open_video_file_tool_strip_menu_item_";
-      this->open_video_file_tool_strip_menu_item_->Size = System::Drawing::Size(160, 22);
-      this->open_video_file_tool_strip_menu_item_->Text = L"Open Video File";
+      this->grid_size_track_bar_->Location = System::Drawing::Point(10, 120);
+      this->grid_size_track_bar_->Maximum = 200;
+      this->grid_size_track_bar_->Minimum = 4;
+      this->grid_size_track_bar_->Name = L"grid_size_track_bar_";
+      this->grid_size_track_bar_->Size = System::Drawing::Size(100, 45);
+      this->grid_size_track_bar_->TabIndex = 2;
+      this->grid_size_track_bar_->TickStyle = System::Windows::Forms::TickStyle::None;
+      this->grid_size_track_bar_->Value = 20;
+      // 
+      // grid_size_label_
+      // 
+      this->grid_size_label_->AutoSize = true;
+      this->grid_size_label_->Location = System::Drawing::Point(15, 150);
+      this->grid_size_label_->Name = L"grid_size_label_";
+      this->grid_size_label_->Size = System::Drawing::Size(53, 13);
+      this->grid_size_label_->TabIndex = 3;
+      this->grid_size_label_->Text = L"Grid size :";
+      // 
+      // original_size_label_
+      // 
+      this->original_size_label_->AutoSize = true;
+      this->original_size_label_->Location = System::Drawing::Point(15, 50);
+      this->original_size_label_->Name = L"original_size_label_";
+      this->original_size_label_->Size = System::Drawing::Size(69, 13);
+      this->original_size_label_->TabIndex = 4;
+      this->original_size_label_->Text = L"Original size :";
+      // 
+      // target_size_label_
+      // 
+      this->target_size_label_->AutoSize = true;
+      this->target_size_label_->Location = System::Drawing::Point(15, 80);
+      this->target_size_label_->Name = L"target_size_label_";
+      this->target_size_label_->Size = System::Drawing::Size(65, 13);
+      this->target_size_label_->TabIndex = 5;
+      this->target_size_label_->Text = L"Target size :";
+      // 
+      // start_button_
+      // 
+      this->start_button_->Location = System::Drawing::Point(15, 250);
+      this->start_button_->Name = L"start_button_";
+      this->start_button_->Size = System::Drawing::Size(100, 25);
+      this->start_button_->TabIndex = 6;
+      this->start_button_->Text = L"Start";
+      this->start_button_->UseVisualStyleBackColor = true;
       // 
       // GLForm
       // 
       this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
       this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
-      this->ClientSize = System::Drawing::Size(1264, 762);
+      this->ClientSize = System::Drawing::Size(1084, 662);
+      this->Controls->Add(this->start_button_);
+      this->Controls->Add(this->target_size_label_);
+      this->Controls->Add(this->original_size_label_);
+      this->Controls->Add(this->grid_size_label_);
+      this->Controls->Add(this->grid_size_track_bar_);
       this->Controls->Add(this->gl_panel_);
       this->Controls->Add(this->menu_strip_);
       this->MainMenuStrip = this->menu_strip_;
@@ -308,6 +372,7 @@ namespace ContentAwareRetargeting {
       this->Text = L"Content-Aware Retargeting";
       this->menu_strip_->ResumeLayout(false);
       this->menu_strip_->PerformLayout();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->grid_size_track_bar_))->EndInit();
       this->ResumeLayout(false);
       this->PerformLayout();
 

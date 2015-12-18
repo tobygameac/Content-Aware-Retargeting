@@ -32,7 +32,7 @@ double SignifanceColorToSaliencyValue(cv::Vec3b &signifance_color) {
 
 void ObjectPreservingVideoWarping(const std::string &source_video_file_directory, const std::string &source_video_file_name, std::vector<Graph<glm::vec2> > &target_graphs, int target_video_width, const int target_video_height, const double mesh_width, const double mesh_height) {
   if (target_video_width <= 0 || target_video_height <= 0) {
-    printf("Wrong target video size (%d x %d)\n", target_video_width, target_video_height);
+    std::cout << "Wrong target video size (" << target_video_width << " x " << target_video_height << ")\n";
     return;
   }
 

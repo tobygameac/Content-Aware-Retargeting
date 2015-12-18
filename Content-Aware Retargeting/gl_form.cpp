@@ -26,11 +26,12 @@ namespace ContentAwareRetargeting {
 
     InitializeOpenGL();
 
-    //ChangeProgramStatus(VIEW_BASIC_DEMO);
+    ChangeProgramStatus(IDLE);
 
     open_image_file_tool_strip_menu_item_->Click += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnButtonsClick);
     open_video_file_tool_strip_menu_item_->Click += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnButtonsClick);
     save_screen_tool_strip_menu_item_->Click += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnButtonsClick);
+    start_button_->Click += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnButtonsClick);
 
     is_dragging_panel = false;
 
@@ -39,6 +40,10 @@ namespace ContentAwareRetargeting {
     gl_panel_->MouseMove += gcnew System::Windows::Forms::MouseEventHandler(this, &ContentAwareRetargeting::GLForm::OnMouseMove);
 
     this->KeyDown += gcnew System::Windows::Forms::KeyEventHandler(this, &ContentAwareRetargeting::GLForm::OnKeyDown);
+
+    grid_size_track_bar_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnTrackBarsValueChanged);
+    current_grid_size = grid_size_track_bar_->Value;
+    grid_size_label_->Text = "Grid size : " + current_grid_size;
   }
 
   bool GLForm::ParseFileIntoString(const std::string &file_path, std::string &file_string) {
@@ -206,6 +211,10 @@ namespace ContentAwareRetargeting {
     SwapBuffers(hdc);
   }
 
+  void GLForm::ChangeProgramStatus(const ProgramStatus &new_program_status) {
+    program_status = new_program_status;
+  }
+
   cv::Mat GLForm::GLScreenToMat() {
     unsigned char *screen_image_data(new unsigned char[3 * gl_panel_->Width * gl_panel_->Height]);
     glReadBuffer(GL_FRONT);
@@ -236,7 +245,7 @@ namespace ContentAwareRetargeting {
     new_panel_width = std::min(MAX_PANEL_WIDTH, new_panel_width);
     new_panel_height = std::min(MAX_PANEL_HEIGHT, new_panel_height);
 
-    std::cout << "Panel size : " << new_panel_width << " X " << new_panel_height << "\n";
+    target_size_label_->Text = "Target size : " + new_panel_width + " X " + new_panel_height;
 
     gl_panel_->Width = new_panel_width;
     gl_panel_->Height = new_panel_height;
@@ -298,7 +307,7 @@ namespace ContentAwareRetargeting {
     }
   }
 
-  void GLForm::ContentAwareRetargeting(const int target_image_width, const int target_image_height, const float grid_size) {
+  void GLForm::ContentAwareImageRetargeting(const int target_image_width, const int target_image_height, const float grid_size) {
     if (!source_image.size().width || !source_image.size().height) {
       return;
     }
@@ -696,6 +705,8 @@ namespace ContentAwareRetargeting {
 
         ChangeGLPanelSize(source_image.size().width, source_image.size().height);
 
+        original_size_label_->Text = "Target size : " + gl_panel_->Width + " X " + gl_panel_->Height;
+
         BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, current_grid_size);
 
         GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
@@ -706,7 +717,7 @@ namespace ContentAwareRetargeting {
 
         data_for_image_warping_were_generated = false;
 
-        //ChangeProgramStatus(VIEW_OBJ);
+        ChangeProgramStatus(ProgramStatus::IMAGE_RETARGETING);
       }
 
     } else if (sender == open_video_file_tool_strip_menu_item_) {
@@ -729,18 +740,26 @@ namespace ContentAwareRetargeting {
         source_video_frames.clear();
 
         cv::Mat video_frame;
-        int frame_count = 0;
 
         while (video_capture.read(video_frame)) {
           source_video_frames.push_back(video_frame.clone());
-          ++frame_count;
         }
 
         if (source_video_frames.size()) {
-          ContentAwareVideoRetargetingUsingObjectPreservingWarping(source_video_frames[0].size().width * 0.5, source_video_frames[0].size().height * 1, current_grid_size);
+          ChangeGLPanelSize(source_video_frames[0].size().width, source_video_frames[0].size().height);
+
+          original_size_label_->Text = "Original size : " + gl_panel_->Width + " X " + gl_panel_->Height;
+
+          BuildGridMeshAndGraphForImage(source_video_frames[0], gl_panel_image_mesh, image_graph, current_grid_size);
+
+          GLTexture::SetGLTexture(source_video_frames[0], &gl_panel_image_mesh.texture_id_);
+
+          gl_panel_image_mesh.Upload();
+
+          RenderGLPanel();
         }
 
-        //ChangeProgramStatus(VIEW_OBJ);
+        ChangeProgramStatus(ProgramStatus::VIDEO_RETARGETING);
       }
 
     } else if (sender == save_screen_tool_strip_menu_item_) {
@@ -764,6 +783,13 @@ namespace ContentAwareRetargeting {
           SaveGLScreen(screen_file_path);
         }
       }
+    } else if (sender == start_button_) {
+
+      if (program_status == ProgramStatus::IMAGE_RETARGETING) {
+        ContentAwareImageRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
+      } else if (program_status == ProgramStatus::VIDEO_RETARGETING) {
+        ContentAwareVideoRetargetingUsingObjectPreservingWarping(gl_panel_->Width, gl_panel_->Height, current_grid_size);
+      }
     }
   }
 
@@ -777,7 +803,7 @@ namespace ContentAwareRetargeting {
     if (sender == gl_panel_) {
       if (is_dragging_panel) {
         is_dragging_panel = false;
-        ContentAwareRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
+        ContentAwareImageRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
       }
     }
   }
@@ -795,8 +821,8 @@ namespace ContentAwareRetargeting {
 
         //gl_panel_image_mesh.Upload();
 
-        //RenderGLPanel();
       }
+      RenderGLPanel();
     }
   }
 
@@ -831,5 +857,13 @@ namespace ContentAwareRetargeting {
 
     printf("(%.1f %.1f %.1f) (%.1f %.1f %.1f)\n", eye_position.x, eye_position.y, eye_position.z, look_at_position.x, look_at_position.y, look_at_position.z);
   }
+
+  void GLForm::OnTrackBarsValueChanged(System::Object ^sender, System::EventArgs ^e) {
+    if (sender == grid_size_track_bar_) {
+      current_grid_size = grid_size_track_bar_->Value;
+      grid_size_label_->Text = "Grid size : " + current_grid_size;
+    }
+  }
+
 
 }
