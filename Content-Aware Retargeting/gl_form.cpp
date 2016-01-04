@@ -216,13 +216,13 @@ namespace ContentAwareRetargeting {
   }
 
   cv::Mat GLForm::GLScreenToMat() {
-    unsigned char *screen_image_data(new unsigned char[3 * gl_panel_->Width * gl_panel_->Height]);
+    std::vector<unsigned char> screen_image_data(3 * gl_panel_->Width * gl_panel_->Height);
+
     glReadBuffer(GL_FRONT);
-    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, screen_image_data);
-    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, screen_image_data);
+    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, &screen_image_data[0]);
+    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, &screen_image_data[0]);
     cv::flip(screen_image, screen_image, 0);
 
-    //delete screen_image_data;
     return screen_image;
   }
 
@@ -278,9 +278,8 @@ namespace ContentAwareRetargeting {
     target_mesh = GLMesh();
     target_mesh.vertices_type = GL_QUADS;
 
-    int i = 0;
-    for (int r = 0; r < mesh_row_count - 1; ++r) {
-      for (int c = 0; c < mesh_column_count - 1; ++c) {
+    for (size_t r = 0; r < mesh_row_count - 1; ++r) {
+      for (size_t c = 0; c < mesh_column_count - 1; ++c) {
         std::vector<size_t> vertex_indices;
 
         size_t base_index = r * (mesh_column_count)+c;
@@ -292,13 +291,15 @@ namespace ContentAwareRetargeting {
         if (!c) {
           target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[1])));
         }
+
         target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[1], vertex_indices[2])));
-        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[2], vertex_indices[3])));
+        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[3], vertex_indices[2])));
+
         if (!r) {
-          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[3], vertex_indices[0])));
+          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[3])));
         }
 
-        for (const auto &vertex_index : vertex_indices) {
+        for (const size_t vertex_index : vertex_indices) {
           target_mesh.vertices_.push_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0));
           target_mesh.uvs_.push_back(glm::vec2(target_graph.vertices_[vertex_index].x / (float)image.size().width, target_graph.vertices_[vertex_index].y / (float)image.size().height));
         }
@@ -321,18 +322,19 @@ namespace ContentAwareRetargeting {
       puts("Done : Gaussian smoothing");
 
       puts("Start : Image segmentation");
-      const double SEGMENTATION_K = (source_image.size().width + source_image.size().height) / 1.75;
-      const double SEGMENTATION_MIN_PATCH_SIZE = (source_image.size().width * source_image.size().height) * 0.0001;
+      //const double SEGMENTATION_K = (source_image.size().width + source_image.size().height) / 1.75;
+      const double SEGMENTATION_K = pow(source_image.size().width * source_image.size().height, 0.6);
+      const double SEGMENTATION_MIN_PATCH_SIZE = (source_image.size().width * source_image.size().height) * 0.001;
       const double SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD = 20;
 
       source_image_after_segmentation = Segmentation(source_image, image_graph, group_of_pixel, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
-      cv::imwrite(source_image_file_directory + "segmentation_" + source_image_file_name, source_image_after_segmentation);
+      cv::imwrite(source_image_file_directory + "segmentation_" + source_image_file_name + ".png", source_image_after_segmentation);
       puts("Done : Image segmentation");
 
       puts("Start : Image saliency calculation");
       const double SALIENCY_C = 3;
       const double SALIENCY_K = 64;
-      saliency_map_of_source_image = CalculateContextAwareSaliencyMapWithMatlabProgram(source_image, saliency_map, source_image_file_directory + source_image_file_name, source_image_file_directory + "saliency_" + source_image_file_name);
+      saliency_map_of_source_image = CalculateContextAwareSaliencyMapWithMatlabProgram(source_image, saliency_map, source_image_file_directory + source_image_file_name, source_image_file_directory + "saliency_" + source_image_file_name + ".png");
 
       // Calculate the saliency value of each patch
       for (size_t r = 0; r < source_image.size().height; ++r) {
@@ -372,7 +374,7 @@ namespace ContentAwareRetargeting {
           significance_map_of_source_image.at<cv::Vec3b>(r, c) = SaliencyValueToSignifanceColor(vertex_saliency);
         }
       }
-      cv::imwrite(source_image_file_directory + "significance_" + source_image_file_name, significance_map_of_source_image);
+      cv::imwrite(source_image_file_directory + "significance_" + source_image_file_name + ".png", significance_map_of_source_image);
 
       puts("Done : Image saliency calculation");
 
@@ -444,6 +446,19 @@ namespace ContentAwareRetargeting {
       return;
     }
 
+
+    const std::string linear_video_path = source_video_file_directory + "linear_" + source_video_file_name + ".avi";
+    cv::VideoWriter linear_video_writer;
+    linear_video_writer.open(linear_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, cv::Size(gl_panel_->Width, gl_panel_->Height));
+
+    for (const cv::Mat &frame : source_video_frames) {
+      cv::Mat resize_frame;
+      cv::resize(frame, resize_frame, cv::Size(gl_panel_->Width, gl_panel_->Height));
+      linear_video_writer.write(resize_frame);
+    }
+
+    std::cout << "Done : Linear video\n";
+
     const std::string segmentation_video_path = source_video_file_directory + "segmentation_" + source_video_file_name + ".avi";
     const std::string significance_video_path = source_video_file_directory + "significance_" + source_video_file_name + ".avi";
 
@@ -496,8 +511,8 @@ namespace ContentAwareRetargeting {
         }
       }
 
-      segmentation_video_writer.release();
-      saliency_video_writer.release();
+      //segmentation_video_writer.release();
+      //saliency_video_writer.release();
 
       std::cout << "Segmented frames and saliency frames are loaded.\n";
 
@@ -655,7 +670,7 @@ namespace ContentAwareRetargeting {
 
       std::ostringstream result_frame_name_oss;
       result_frame_name_oss << "result_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
-      //SaveGLScreen(source_video_file_directory + result_frame_name_oss.str());
+      SaveGLScreen(source_video_file_directory + result_frame_name_oss.str());
 
       result_video_writer.write(GLScreenToMat());
     }
@@ -705,7 +720,7 @@ namespace ContentAwareRetargeting {
 
         ChangeGLPanelSize(source_image.size().width, source_image.size().height);
 
-        original_size_label_->Text = "Target size : " + gl_panel_->Width + " X " + gl_panel_->Height;
+        original_size_label_->Text = "Original size : " + gl_panel_->Width + " X " + gl_panel_->Height;
 
         BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, current_grid_size);
 
@@ -746,9 +761,10 @@ namespace ContentAwareRetargeting {
         }
 
         if (source_video_frames.size()) {
-          ChangeGLPanelSize(source_video_frames[0].size().width, source_video_frames[0].size().height);
 
-          original_size_label_->Text = "Original size : " + gl_panel_->Width + " X " + gl_panel_->Height;
+          ChangeGLPanelSize(source_video_frames[0].size().width * 0.5, source_video_frames[0].size().height);
+
+          original_size_label_->Text = "Original size : " + source_video_frames[0].size().width + " X " + source_video_frames[0].size().height;
 
           BuildGridMeshAndGraphForImage(source_video_frames[0], gl_panel_image_mesh, image_graph, current_grid_size);
 
@@ -787,7 +803,7 @@ namespace ContentAwareRetargeting {
 
       if (program_status == ProgramStatus::IMAGE_RETARGETING) {
         ContentAwareImageRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
-      } else if (program_status == ProgramStatus::VIDEO_RETARGETING) {
+      } else if (program_status == ProgramStatus::VIDEO_RETARGETING) {        
         ContentAwareVideoRetargetingUsingObjectPreservingWarping(gl_panel_->Width, gl_panel_->Height, current_grid_size);
       }
     }
@@ -803,7 +819,10 @@ namespace ContentAwareRetargeting {
     if (sender == gl_panel_) {
       if (is_dragging_panel) {
         is_dragging_panel = false;
-        ContentAwareImageRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
+
+        if (program_status == ProgramStatus::IMAGE_RETARGETING) {
+          ContentAwareImageRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
+        }
       }
     }
   }

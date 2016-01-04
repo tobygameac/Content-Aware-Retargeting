@@ -1,5 +1,4 @@
-#ifndef DISJOINT_SET_H_
-#define DISJOINT_SET_H_
+#pragma once
 
 #include <vector>
 
@@ -10,31 +9,31 @@ public:
   DisjointSet() {
   }
 
-  DisjointSet(int group_count) : group_count(group_count) {
+  DisjointSet(size_t group_count) : group_count(group_count) {
     group_of_element_at.resize(group_count);
     group_size.resize(group_count);
-    for (int i = 0; i < group_count; ++i) {
+    for (size_t i = 0; i < group_count; ++i) {
       group_of_element_at[i] = i;
       group_size[i] = 1;
     }
   }
 
-  int GroupCount() {
+  size_t GroupCount() {
     return group_count;
   }
 
-  int SizeOfGroup(int x) {
-    int group_of_x = FindGroup(x);
+  size_t SizeOfGroup(size_t x) {
+    size_t group_of_x = FindGroup(x);
     return group_size[group_of_x];
   }
 
-  int FindGroup(int x) {
+  size_t FindGroup(size_t x) {
     return (x == group_of_element_at[x]) ? x : (group_of_element_at[x] = FindGroup(group_of_element_at[x]));
   }
 
-  void UnionGroup(int x, int y) {
-    int group_of_x = FindGroup(x);
-    int group_of_y = FindGroup(y);
+  void UnionGroup(size_t x, size_t y) {
+    size_t group_of_x = FindGroup(x);
+    size_t group_of_y = FindGroup(y);
     if (group_of_x == group_of_y) {
       return;
     }
@@ -45,9 +44,7 @@ public:
 
 private:
 
-  int group_count;
-  std::vector<int> group_of_element_at;
-  std::vector<int> group_size;
+  size_t group_count;
+  std::vector<size_t> group_of_element_at;
+  std::vector<size_t> group_size;
 };
-
-#endif

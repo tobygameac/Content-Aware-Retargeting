@@ -22,13 +22,13 @@ void BuildGraphFromImage(const cv::Mat &image, Graph<glm::vec2> &target_graph) {
     for (int c = 0; c < image.size().width; ++c) {
       target_graph.vertices_.push_back(glm::vec2(c, r));
 
-      int index = r * image.size().width + c;
+      size_t index = r * image.size().width + c;
 
-      for (int direction = 0; direction < 4; ++direction) {
+      for (size_t direction = 0; direction < 4; ++direction) {
         int neighbor_r = r + DELTA_R[direction];
         int neighbor_c = c + DELTA_C[direction];
         if (neighbor_r >= 0 && neighbor_r < image.size().height && neighbor_c >= 0 && neighbor_c < image.size().width) {
-          int neighbor_index = neighbor_r * image.size().width + neighbor_c;
+          size_t neighbor_index = neighbor_r * image.size().width + neighbor_c;
           std::pair<size_t, size_t> e(index, neighbor_index);
 
           double w[3];
@@ -60,8 +60,8 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
 
   // Segmentation
   for (const auto &edge : target_graph.edges_) {
-    int group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
+    size_t group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
+    size_t group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
     if (group_of_x == group_of_y) {
       continue;
     }
@@ -73,8 +73,8 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
 
   // Deal with the smaller set
   for (const auto &edge : target_graph.edges_) {
-    int group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
+    size_t group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
+    size_t group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
     if (group_of_x == group_of_y) {
       continue;
     }
@@ -87,9 +87,9 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
   std::vector<cv::Vec3d> group_color(target_graph.vertices_.size());
   for (int r = 0; r < image.size().height; ++r) {
     for (int c = 0; c < image.size().width; ++c) {
-      int index = r * image.size().width + c;
-      int group = vertex_disjoint_set.FindGroup(index);
-      int group_size = vertex_disjoint_set.SizeOfGroup(group);
+      size_t index = r * image.size().width + c;
+      size_t group = vertex_disjoint_set.FindGroup(index);
+      size_t group_size = vertex_disjoint_set.SizeOfGroup(group);
       if (group_size) {
         for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
           group_color[group].val[pixel_index] += image.at<cv::Vec3b>(r, c).val[pixel_index] / (double)group_size;
@@ -100,8 +100,8 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
 
   // Deal with the similar color set
   for (const auto &edge : target_graph.edges_) {
-    int group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
-    int group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
+    size_t group_of_x = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.first);
+    size_t group_of_y = vertex_disjoint_set.FindGroup(edge.edge_indices_pair_.second);
     if (group_of_x == group_of_y) {
       continue;
     }
@@ -122,11 +122,11 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
     }
   }
 
-  for (int r = 0; r < image.size().height; ++r) {
-    for (int c = 0; c < image.size().width; ++c) {
-      int index = r * image.size().width + c;
-      int group = vertex_disjoint_set.FindGroup(index);
-      int group_size = vertex_disjoint_set.SizeOfGroup(group);
+  for (size_t r = 0; r < image.size().height; ++r) {
+    for (size_t c = 0; c < image.size().width; ++c) {
+      size_t index = r * image.size().width + c;
+      size_t group = vertex_disjoint_set.FindGroup(index);
+      size_t group_size = vertex_disjoint_set.SizeOfGroup(group);
       if (group_size) {
         for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
           group_color[group].val[pixel_index] += image.at<cv::Vec3b>(r, c).val[pixel_index] / (double)group_size;
@@ -142,8 +142,8 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
 
   for (int r = 0; r < image.size().height; ++r) {
     for (int c = 0; c < image.size().width; ++c) {
-      int index = r * image.size().width + c;
-      int group = vertex_disjoint_set.FindGroup(index);
+      size_t index = r * image.size().width + c;
+      size_t group = vertex_disjoint_set.FindGroup(index);
       group_of_pixel[r][c] = group;
       for (size_t pixel_index = 0; pixel_index < 3; ++pixel_index) {
         image_after_segmentation.at<cv::Vec3b>(r, c).val[pixel_index] = (unsigned char)group_color[group].val[pixel_index];
