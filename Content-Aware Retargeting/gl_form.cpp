@@ -206,6 +206,9 @@ namespace ContentAwareRetargeting {
     glUniformMatrix4fv(shader_uniform_projection_matrix_id, 1, GL_FALSE, glm::value_ptr(projection_matrix));
     glUniformMatrix4fv(shader_uniform_view_matrix_id, 1, GL_FALSE, glm::value_ptr(view_matrix));
 
+    if (viewing_lines_mesh) {
+      gl_panel_lines_mesh.Draw(modelview_matrix);
+    }
     gl_panel_image_mesh.Draw(modelview_matrix);
 
     SwapBuffers(hdc);
@@ -213,17 +216,6 @@ namespace ContentAwareRetargeting {
 
   void GLForm::ChangeProgramStatus(const ProgramStatus &new_program_status) {
     program_status = new_program_status;
-  }
-
-  cv::Mat GLForm::GLScreenToMat() {
-    std::vector<unsigned char> screen_image_data(3 * gl_panel_->Width * gl_panel_->Height);
-
-    glReadBuffer(GL_FRONT);
-    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, &screen_image_data[0]);
-    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, &screen_image_data[0]);
-    cv::flip(screen_image, screen_image, 0);
-
-    return screen_image;
   }
 
   void GLForm::SaveGLScreen(const std::string &file_path) {
@@ -236,6 +228,17 @@ namespace ContentAwareRetargeting {
     cv::flip(screen_image, screen_image, 0);
     cv::imwrite(file_path, screen_image);
     std::cout << "Screen saved : " << file_path << "\n";
+  }
+
+  void GLForm::SaveGLScreenToVideo(cv::VideoWriter &video_writer) {
+    std::vector<unsigned char> screen_image_data(3 * gl_panel_->Width * gl_panel_->Height);
+
+    glReadBuffer(GL_FRONT);
+    glReadPixels(0, 0, gl_panel_->Width, gl_panel_->Height, GL_BGR, GL_UNSIGNED_BYTE, &screen_image_data[0]);
+    cv::Mat screen_image(gl_panel_->Height, gl_panel_->Width, CV_8UC3, &screen_image_data[0]);
+    cv::flip(screen_image, screen_image, 0);
+
+    video_writer.write(screen_image);
   }
 
   void GLForm::ChangeGLPanelSize(int new_panel_width, int new_panel_height) {
@@ -282,7 +285,7 @@ namespace ContentAwareRetargeting {
       for (size_t c = 0; c < mesh_column_count - 1; ++c) {
         std::vector<size_t> vertex_indices;
 
-        size_t base_index = r * (mesh_column_count)+c;
+        size_t base_index = r * mesh_column_count + c;
         vertex_indices.push_back(base_index);
         vertex_indices.push_back(base_index + mesh_column_count);
         vertex_indices.push_back(base_index + mesh_column_count + 1);
@@ -300,12 +303,32 @@ namespace ContentAwareRetargeting {
         }
 
         for (const size_t vertex_index : vertex_indices) {
-          target_mesh.vertices_.push_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0));
+          target_mesh.vertices_.push_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0.0f));
           target_mesh.uvs_.push_back(glm::vec2(target_graph.vertices_[vertex_index].x / (float)image.size().width, target_graph.vertices_[vertex_index].y / (float)image.size().height));
         }
-
       }
     }
+  }
+
+  void GLForm::BuildLinesMeshFromGridMesh(const GLMesh &source_mesh, GLMesh &target_mesh) {
+    target_mesh = GLMesh();
+    target_mesh.vertices_type = GL_LINES;
+
+    for (size_t vertex_index = 0; vertex_index < source_mesh.vertices_.size(); vertex_index += 4) {
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index]);
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 1]);
+
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 1]);
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 2]);
+
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 2]);
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 3]);
+
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 3]);
+      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index]);
+    }
+
+    target_mesh.colors_ = std::vector<glm::vec3>(target_mesh.vertices_.size(), glm::vec3(255, 0, 0));
   }
 
   void GLForm::ContentAwareImageRetargeting(const int target_image_width, const int target_image_height, const float grid_size) {
@@ -435,6 +458,9 @@ namespace ContentAwareRetargeting {
 
     gl_panel_image_mesh.Upload();
 
+    BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
+    gl_panel_lines_mesh.Upload();
+
     //double cotanget_of_half_of_fovy = 1.0 / tan(glm::radians(FOVY / 2.0f));
     //eye_position.z = cotanget_of_half_of_fovy * (target_image_height / 2.0);
 
@@ -449,7 +475,7 @@ namespace ContentAwareRetargeting {
 
     const std::string linear_video_path = source_video_file_directory + "linear_" + source_video_file_name + ".avi";
     cv::VideoWriter linear_video_writer;
-    linear_video_writer.open(linear_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, cv::Size(gl_panel_->Width, gl_panel_->Height));
+    linear_video_writer.open(linear_video_path, /*CV_FOURCC('M', 'J', 'P', 'G')*/0, source_video_fps, cv::Size(gl_panel_->Width, gl_panel_->Height));
 
     for (const cv::Mat &frame : source_video_frames) {
       cv::Mat resize_frame;
@@ -473,10 +499,10 @@ namespace ContentAwareRetargeting {
       }
 
       cv::VideoWriter segmentation_video_writer;
-      segmentation_video_writer.open(segmentation_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, source_video_frames[0].size());
+      segmentation_video_writer.open(segmentation_video_path, /*CV_FOURCC('M', 'J', 'P', 'G')*/0, source_video_fps, source_video_frames[0].size());
 
       cv::VideoWriter saliency_video_writer;
-      saliency_video_writer.open(source_video_file_directory + "saliency_" + source_video_file_name + ".avi", CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, source_video_frames[0].size());
+      saliency_video_writer.open(source_video_file_directory + "saliency_" + source_video_file_name + ".avi", /*CV_FOURCC('M', 'J', 'P', 'G')*/0, source_video_fps, source_video_frames[0].size());
 
       for (size_t t = 0; t < source_video_frames.size(); ++t) {
         std::ostringstream video_frame_name_oss;
@@ -579,17 +605,17 @@ namespace ContentAwareRetargeting {
       //}
 
       cv::VideoWriter significance_video_writer;
-      significance_video_writer.open(significance_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, source_video_frames[0].size());
+      significance_video_writer.open(significance_video_path, /*CV_FOURCC('M', 'J', 'P', 'G')*/0, source_video_fps, source_video_frames[0].size());
 
       for (size_t t = 0; t < source_video_frames.size(); ++t) {
 
         std::ostringstream video_frame_segmentation_name_oss;
         video_frame_segmentation_name_oss << "segmentation_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
-        
+
         if (!std::fstream(source_video_file_directory + video_frame_segmentation_name_oss.str()).good()) {
           break;
         }
-        
+
         cv::Mat segmentation_video_frame = cv::imread(source_video_file_directory + video_frame_segmentation_name_oss.str());
 
         cv::Mat significance_frame = segmentation_video_frame.clone();
@@ -636,7 +662,7 @@ namespace ContentAwareRetargeting {
 
     const std::string result_video_path = source_video_file_directory + "result_" + source_video_file_name + ".avi";
     cv::VideoWriter result_video_writer;
-    result_video_writer.open(result_video_path, CV_FOURCC('M', 'J', 'P', 'G'), source_video_fps, cv::Size(target_video_width, target_video_height));
+    result_video_writer.open(result_video_path, /*CV_FOURCC('M', 'J', 'P', 'G')*/0, source_video_fps, cv::Size(target_video_width, target_video_height));
 
     for (size_t t = 0; t < frame_count; ++t) {
       size_t mesh_column_count = (size_t)(source_video_frames[t].size().width / grid_size) + 1;
@@ -666,13 +692,16 @@ namespace ContentAwareRetargeting {
       GLTexture::SetGLTexture(source_video_frames[t], &gl_panel_image_mesh.texture_id_);
       gl_panel_image_mesh.Upload();
 
+      BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
+      gl_panel_lines_mesh.Upload();
+
       RenderGLPanel();
 
       std::ostringstream result_frame_name_oss;
       result_frame_name_oss << "result_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
       SaveGLScreen(source_video_file_directory + result_frame_name_oss.str());
 
-      result_video_writer.write(GLScreenToMat());
+      SaveGLScreenToVideo(result_video_writer);
     }
   }
 
@@ -728,6 +757,9 @@ namespace ContentAwareRetargeting {
 
         gl_panel_image_mesh.Upload();
 
+        BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
+        gl_panel_lines_mesh.Upload();
+
         RenderGLPanel();
 
         data_for_image_warping_were_generated = false;
@@ -772,6 +804,9 @@ namespace ContentAwareRetargeting {
 
           gl_panel_image_mesh.Upload();
 
+          BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
+          gl_panel_lines_mesh.Upload();
+
           RenderGLPanel();
         }
 
@@ -803,7 +838,7 @@ namespace ContentAwareRetargeting {
 
       if (program_status == ProgramStatus::IMAGE_RETARGETING) {
         ContentAwareImageRetargeting(gl_panel_->Width, gl_panel_->Height, current_grid_size);
-      } else if (program_status == ProgramStatus::VIDEO_RETARGETING) {        
+      } else if (program_status == ProgramStatus::VIDEO_RETARGETING) {
         ContentAwareVideoRetargetingUsingObjectPreservingWarping(gl_panel_->Width, gl_panel_->Height, current_grid_size);
       }
     }
@@ -840,6 +875,9 @@ namespace ContentAwareRetargeting {
 
         //gl_panel_image_mesh.Upload();
 
+        //BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
+        //gl_panel_lines_mesh.Upload();
+
       }
       RenderGLPanel();
     }
@@ -870,11 +908,12 @@ namespace ContentAwareRetargeting {
       ++eye_position.x;
       ++look_at_position.x;
       break;
+    case Keys::L:
+      viewing_lines_mesh = !viewing_lines_mesh;
+      break;
     }
 
     RenderGLPanel();
-
-    printf("(%.1f %.1f %.1f) (%.1f %.1f %.1f)\n", eye_position.x, eye_position.y, eye_position.z, look_at_position.x, look_at_position.y, look_at_position.z);
   }
 
   void GLForm::OnTrackBarsValueChanged(System::Object ^sender, System::EventArgs ^e) {

@@ -36,12 +36,12 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
     return;
   }
 
-  const double DST_WEIGHT = 5.5;
+  const double DST_WEIGHT = 27.5;
   const double DLT_WEIGHT = 0.8;
   const double ORIENTATION_WEIGHT = 12.0;
 
-  const double OBJECT_COHERENCE_WEIGHT = 0.04;
-  const double LINE_COHERENCE_WEIGHT = 0.02;
+  const double OBJECT_COHERENCE_WEIGHT = 4;
+  const double LINE_COHERENCE_WEIGHT = 2;
 
   //const double DST_WEIGHT = 0.7;
   //const double DLT_WEIGHT = 0.3;
@@ -116,7 +116,7 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
       for (size_t column = 1; column < mesh_column_count; ++column) {
         size_t vertex_index_right = row * mesh_column_count + column;
         size_t vertex_index_left = row * mesh_column_count + column - 1;
-        //hard_constraint.add((x[vertex_index_right * 2] - x[vertex_index_left * 2]) >= 1e-4);
+        hard_constraint.add((x[vertex_index_right * 2] - x[vertex_index_left * 2]) >= 1e-4);
       }
     }
 
@@ -124,7 +124,7 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
       for (size_t column = 0; column < mesh_column_count; ++column) {
         size_t vertex_index_down = row * mesh_column_count + column;
         size_t vertex_index_up = (row - 1) * mesh_column_count + column;
-        //hard_constraint.add((x[vertex_index_down * 2 + 1] - x[vertex_index_up * 2 + 1]) >= 1e-4);
+        hard_constraint.add((x[vertex_index_down * 2 + 1] - x[vertex_index_up * 2 + 1]) >= 1e-4);
       }
     }
 
@@ -156,11 +156,12 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
         first_appear_group_list.insert(group_1);
 
         object_saliency[group_1] = SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index_1].y, target_graph.vertices_[vertex_index_1].x));
-        object_saliency[group_1] += SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index_2].y, target_graph.vertices_[vertex_index_2].x));
-        object_saliency[group_1] /= 2.0;
 
         object_representive_edge[group_1] = target_graph.edges_[edge_index];
-      } else { // Average deformation
+      }
+
+      // Average deformation 
+      if (first_appear_group_list.find(group_1) == first_appear_group_list.end()) {
         const glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[group_1];
         const glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[group_1];
         float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
@@ -180,12 +181,13 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
         if (object_saliency.find(group_2) == object_saliency.end()) {
           first_appear_group_list.insert(group_2);
 
-          object_saliency[group_2] = SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index_1].y, target_graph.vertices_[vertex_index_1].x));
-          object_saliency[group_2] += SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index_2].y, target_graph.vertices_[vertex_index_2].x));
-          object_saliency[group_2] /= 2.0;
+          object_saliency[group_2] = SignifanceColorToSaliencyValue(significance_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index_2].y, target_graph.vertices_[vertex_index_2].x));
 
           object_representive_edge[group_2] = target_graph.edges_[edge_index];
-        } else { // Average deformation
+        }
+
+        // Average deformation 
+        if (first_appear_group_list.find(group_2) == first_appear_group_list.end()) {
           const glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[group_2];
           const glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[group_2];
           float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
@@ -288,7 +290,7 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
     if (!cplex.solve()) {
       std::cout << "Failed to optimize the model. (frame : " << t << ")\n";
     } else {
-      std::cout << "Done. (frame : " << t << " / " << target_graphs.size() << ")\n";
+      std::cout << "Done. (frame : " << (t + 1) << " / " << target_graphs.size() << ")\n";
     }
 
     IloNumArray result(env);
@@ -396,8 +398,8 @@ void PatchBasedWarping(const cv::Mat &image, Graph<glm::vec2> &target_graph, con
       continue;
     }
 
-    const Edge &representive_edge = target_graph.edges_[edge_index_list[edge_index_list.size() / 2]];
-    //const Edge &representive_edge = target_graph.edges_[edge_index_list[0]];
+    //const Edge &representive_edge = target_graph.edges_[edge_index_list[edge_index_list.size() / 2]];
+    const Edge &representive_edge = target_graph.edges_[edge_index_list[0]];
 
     double c_x = target_graph.vertices_[representive_edge.edge_indices_pair_.first].x - target_graph.vertices_[representive_edge.edge_indices_pair_.second].x;
     double c_y = target_graph.vertices_[representive_edge.edge_indices_pair_.first].y - target_graph.vertices_[representive_edge.edge_indices_pair_.second].y;

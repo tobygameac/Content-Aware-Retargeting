@@ -43,6 +43,8 @@ namespace ContentAwareRetargeting {
 
   ProgramStatus program_status;
 
+  bool viewing_lines_mesh = true;
+
   const std::string DEFAULT_VERTEX_SHADER_FILE_PATH = "..\\shader\\vertex_shader.glsl";
   const std::string DEFAULT_FRAGMENT_SHADER_FILE_PATH = "..\\shader\\fragment_shader.glsl";
 
@@ -102,6 +104,7 @@ namespace ContentAwareRetargeting {
   int source_video_fourcc;
 
   GLMesh gl_panel_image_mesh;
+  GLMesh gl_panel_lines_mesh;
 
   const float GRID_LINE_WIDTH = 4.5;
   const float GRID_POINT_SIZE = 7.5;
@@ -160,13 +163,15 @@ namespace ContentAwareRetargeting {
 
     void ChangeProgramStatus(const ProgramStatus &new_program_status);
 
-    cv::Mat GLScreenToMat();
-
     void SaveGLScreen(const std::string &file_path);
+
+    void SaveGLScreenToVideo(cv::VideoWriter &video_writer);
 
     void ChangeGLPanelSize(int new_panel_width, int new_panel_height);
 
     void BuildGridMeshAndGraphForImage(const cv::Mat &image, GLMesh &target_mesh, Graph<glm::vec2> &G, float grid_size);
+
+    void BuildLinesMeshFromGridMesh(const GLMesh &source_mesh, GLMesh &target_mesh);
 
     void ContentAwareImageRetargeting(const int target_image_width, const int target_image_height, const float grid_size);
 
@@ -367,6 +372,7 @@ namespace ContentAwareRetargeting {
       this->Controls->Add(this->grid_size_track_bar_);
       this->Controls->Add(this->gl_panel_);
       this->Controls->Add(this->menu_strip_);
+      this->KeyPreview = true;
       this->MainMenuStrip = this->menu_strip_;
       this->Name = L"GLForm";
       this->Text = L"Content-Aware Retargeting";
