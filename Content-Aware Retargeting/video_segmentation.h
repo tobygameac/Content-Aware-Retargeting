@@ -69,7 +69,7 @@ void VideoSegmentation(const std::string &video_file_directory, const std::strin
 
   std::string segment_converter_command = SEGMENT_CONVERTER_PROGRAM_PATH;
   segment_converter_command += " --input=\"" + video_file_directory + video_file_name + ".pb\"";
-  segment_converter_command += " --bitmap_ids=0";
+  segment_converter_command += " --bitmap_ids=0.0";
   //segment_converter_command += " --bitmap_color=0.1";
   //segment_converter_command += " --text_format";
   if (video_file_directory[video_file_directory.length() - 1] == '\\') {

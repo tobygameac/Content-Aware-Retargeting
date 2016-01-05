@@ -43,7 +43,7 @@ namespace ContentAwareRetargeting {
 
   ProgramStatus program_status;
 
-  bool viewing_lines_mesh = true;
+  bool viewing_lines_mesh = false;
 
   const std::string DEFAULT_VERTEX_SHADER_FILE_PATH = "..\\shader\\vertex_shader.glsl";
   const std::string DEFAULT_FRAGMENT_SHADER_FILE_PATH = "..\\shader\\fragment_shader.glsl";
@@ -248,7 +248,7 @@ namespace ContentAwareRetargeting {
       // 
       // gl_panel_
       // 
-      this->gl_panel_->BorderStyle = System::Windows::Forms::BorderStyle::Fixed3D;
+      this->gl_panel_->BackColor = System::Drawing::SystemColors::Desktop;
       this->gl_panel_->Cursor = System::Windows::Forms::Cursors::Default;
       this->gl_panel_->Location = System::Drawing::Point(200, 50);
       this->gl_panel_->Name = L"gl_panel_";

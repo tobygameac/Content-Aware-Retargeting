@@ -908,6 +908,18 @@ namespace ContentAwareRetargeting {
       ++eye_position.x;
       ++look_at_position.x;
       break;
+    case Keys::W:
+      ChangeGLPanelSize(gl_panel_->Width, gl_panel_->Height - 1);
+      break;
+    case Keys::A:
+      ChangeGLPanelSize(gl_panel_->Width - 1, gl_panel_->Height);
+      break;
+    case Keys::S:
+      ChangeGLPanelSize(gl_panel_->Width, gl_panel_->Height + 1);
+      break;
+    case Keys::D:
+      ChangeGLPanelSize(gl_panel_->Width + 1, gl_panel_->Height);
+      break;
     case Keys::L:
       viewing_lines_mesh = !viewing_lines_mesh;
       break;
