@@ -44,6 +44,18 @@ namespace ContentAwareRetargeting {
     grid_size_track_bar_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnTrackBarsValueChanged);
     current_grid_size = grid_size_track_bar_->Value;
     grid_size_label_->Text = "Grid size : " + current_grid_size;
+
+    show_image_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
+    show_lines_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
+    
+    target_width_numeric_up_down_->Minimum = MIN_PANEL_WIDTH;
+    target_width_numeric_up_down_->Maximum = MAX_PANEL_WIDTH;
+
+    target_height_numeric_up_down_->Minimum = MIN_PANEL_HEIGHT;
+    target_height_numeric_up_down_->Maximum = MAX_PANEL_HEIGHT;
+
+    target_width_numeric_up_down_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnNumericUpDownValueChanged);
+    target_height_numeric_up_down_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnNumericUpDownValueChanged);
   }
 
   bool GLForm::ParseFileIntoString(const std::string &file_path, std::string &file_string) {
@@ -206,10 +218,13 @@ namespace ContentAwareRetargeting {
     glUniformMatrix4fv(shader_uniform_projection_matrix_id, 1, GL_FALSE, glm::value_ptr(projection_matrix));
     glUniformMatrix4fv(shader_uniform_view_matrix_id, 1, GL_FALSE, glm::value_ptr(view_matrix));
 
-    if (viewing_lines_mesh) {
+    if (show_lines_check_box_->Checked) {
       gl_panel_lines_mesh.Draw(modelview_matrix);
     }
-    gl_panel_image_mesh.Draw(modelview_matrix);
+
+    if (show_image_check_box_->Checked) {
+      gl_panel_image_mesh.Draw(modelview_matrix);
+    }
 
     SwapBuffers(hdc);
   }
@@ -921,7 +936,7 @@ namespace ContentAwareRetargeting {
       ChangeGLPanelSize(gl_panel_->Width + 1, gl_panel_->Height);
       break;
     case Keys::L:
-      viewing_lines_mesh = !viewing_lines_mesh;
+      show_lines_check_box_->Checked = !show_lines_check_box_->Checked;
       break;
     }
 
@@ -935,5 +950,15 @@ namespace ContentAwareRetargeting {
     }
   }
 
+  void GLForm::OnCheckBoxesCheckedChanged(System::Object ^sender, System::EventArgs ^e) {
+    RenderGLPanel();
+  }
+
+  void GLForm::OnNumericUpDownValueChanged(System::Object ^sender, System::EventArgs ^e) {
+    if (sender == target_height_numeric_up_down_ || sender == target_width_numeric_up_down_) {
+      ChangeGLPanelSize(System::Decimal::ToInt32(target_width_numeric_up_down_->Value), System::Decimal::ToInt32(target_height_numeric_up_down_->Value));
+    }
+    RenderGLPanel();
+  }
 
 }

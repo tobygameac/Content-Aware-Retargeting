@@ -53,12 +53,13 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
   std::map<size_t, double> object_saliency;
   std::map<size_t, Edge> object_representive_edge;
 
+  std::map<size_t, glm::vec2> object_horizontal_average_deformation_in_the_first_appear_frame;
+  std::map<size_t, glm::vec2> object_vertical_average_deformation_in_the_first_appear_frame;
+
   std::map<size_t, glm::vec2> object_average_deformation_in_the_first_appear_frame;
 
-  //std::map<size_t, glm::vec2> object_horizontal_average_deformation_in_the_first_appear_frame;
-  //std::map<size_t, glm::vec2> object_vertical_average_deformation_in_the_first_appear_frame;
-
   for (size_t t = 0; t < target_graphs.size(); ++t) {
+  //for (int t = target_graphs.size() - 1; t >= 0; --t) {
 
     std::ostringstream video_frame_segmentation_name_oss;
     video_frame_segmentation_name_oss << "segmentation_frame" << std::setw(5) << std::setfill('0') << t << "_" + source_video_file_name + ".png";
@@ -139,6 +140,14 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
       }
     }
 
+    //if (t < target_graphs.size() - 1) {
+    //  for (size_t vertex_index = 0; vertex_index < target_graph.vertices_.size(); ++vertex_index) {
+    //    expr += LINE_COHERENCE_WEIGHT * IloPower(x[vertex_index * 2] - target_graphs[t + 1].vertices_[vertex_index].x, 2.0);
+    //    expr += LINE_COHERENCE_WEIGHT * IloPower(x[vertex_index * 2 + 1] - target_graphs[t + 1].vertices_[vertex_index].y, 2.0);
+    //  }
+    //}
+
+
     // For the boundary pixel
     cv::resize(segmentation_video_frame, segmentation_video_frame, segmentation_video_frame.size() + cv::Size(1, 1));
     cv::resize(significance_video_frame, significance_video_frame, significance_video_frame.size() + cv::Size(1, 1));
@@ -165,23 +174,23 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
 
       // Average deformation 
       if (first_appear_group_list.find(group_1) == first_appear_group_list.end()) {
-        //const glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[group_1];
-        //const glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[group_1];
+        const glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[group_1];
+        const glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[group_1];
 
         const glm::vec2 &average_deformation = object_average_deformation_in_the_first_appear_frame[group_1];
 
         float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
         float delta_y = target_graph.vertices_[vertex_index_1].y - target_graph.vertices_[vertex_index_2].y;
         if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
-          //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - horizontal_average_deformation.x, 2.0);
-          //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - horizontal_average_deformation.y, 2.0);
+          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - horizontal_average_deformation.x, 2.0);
+          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - horizontal_average_deformation.y, 2.0);
 
-          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
+          //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
         } else {
-          //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - vertical_average_deformation.x, 2.0);
-          //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - vertical_average_deformation.y, 2.0);
+          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - vertical_average_deformation.x, 2.0);
+          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - vertical_average_deformation.y, 2.0);
 
-          expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
+          //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
         }
       }
 
@@ -198,23 +207,23 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
 
         // Average deformation 
         if (first_appear_group_list.find(group_2) == first_appear_group_list.end()) {
-          //const glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[group_2];
-          //const glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[group_2];
+          const glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[group_2];
+          const glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[group_2];
 
           const glm::vec2 &average_deformation = object_average_deformation_in_the_first_appear_frame[group_2];
 
           float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
           float delta_y = target_graph.vertices_[vertex_index_1].y - target_graph.vertices_[vertex_index_2].y;
           if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
-            //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - horizontal_average_deformation.x, 2.0);
-            //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - horizontal_average_deformation.y, 2.0);
+            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - horizontal_average_deformation.x, 2.0);
+            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - horizontal_average_deformation.y, 2.0);
 
-            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
+            //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - average_deformation.x, 2.0);
           } else {
-            //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - vertical_average_deformation.x, 2.0);
-            //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - vertical_average_deformation.y, 2.0);
+            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - vertical_average_deformation.x, 2.0);
+            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - vertical_average_deformation.y, 2.0);
 
-            expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
+            //expr += OBJECT_COHERENCE_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - average_deformation.y, 2.0);
           }
         }
       }
@@ -326,13 +335,13 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
 
     // Calculate average deformation for the group appearing first
     for (const size_t first_appear_group_index : first_appear_group_list) {
-      //glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[first_appear_group_index];
-      //glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[first_appear_group_index];
+      glm::vec2 &horizontal_average_deformation = object_horizontal_average_deformation_in_the_first_appear_frame[first_appear_group_index];
+      glm::vec2 &vertical_average_deformation = object_vertical_average_deformation_in_the_first_appear_frame[first_appear_group_index];
 
       glm::vec2 &average_deformation = object_average_deformation_in_the_first_appear_frame[first_appear_group_index];
 
-      //horizontal_average_deformation = glm::vec2(0, 0);
-      //vertical_average_deformation = glm::vec2(0, 0);
+      horizontal_average_deformation = glm::vec2(0, 0);
+      vertical_average_deformation = glm::vec2(0, 0);
 
       average_deformation = glm::vec2(0, 0);
 
@@ -345,23 +354,23 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
         float delta_x = target_graph.vertices_[vertex_index_1].x - target_graph.vertices_[vertex_index_2].x;
         float delta_y = target_graph.vertices_[vertex_index_1].y - target_graph.vertices_[vertex_index_2].y;
         if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
-          //horizontal_average_deformation.x += delta_x;
-          //horizontal_average_deformation.y += delta_y;
+          horizontal_average_deformation.x += delta_x;
+          horizontal_average_deformation.y += delta_y;
 
           average_deformation.x += delta_x;
 
           ++horizontal_edge_count;
         } else {
-          //vertical_average_deformation.x += delta_x;
-          //vertical_average_deformation.y += delta_y;
+          vertical_average_deformation.x += delta_x;
+          vertical_average_deformation.y += delta_y;
 
           average_deformation.y += delta_y;
         }
       }
 
       if (horizontal_edge_count) {
-        //horizontal_average_deformation.x /= (double)horizontal_edge_count;
-        //horizontal_average_deformation.y /= (double)horizontal_edge_count;
+        horizontal_average_deformation.x /= (double)horizontal_edge_count;
+        horizontal_average_deformation.y /= (double)horizontal_edge_count;
 
         average_deformation.x /= (double)horizontal_edge_count;
       }
@@ -369,8 +378,8 @@ void ObjectPreservingVideoWarping(const std::string &source_video_file_directory
       size_t vertical_edge_count = edge_index_list_of_object[first_appear_group_index].size() - horizontal_edge_count;
 
       if (vertical_edge_count) {
-        //vertical_average_deformation.x /= (double)vertical_edge_count;
-        //vertical_average_deformation.y /= (double)vertical_edge_count;
+        vertical_average_deformation.x /= (double)vertical_edge_count;
+        vertical_average_deformation.y /= (double)vertical_edge_count;
 
         average_deformation.y /= (double)vertical_edge_count;
       }
@@ -413,9 +422,9 @@ void PatchBasedWarping(const cv::Mat &image, Graph<glm::vec2> &target_graph, con
     x.add(IloNumVar(env, -IloInfinity, IloInfinity));
   }
 
-  const double DST_WEIGHT = 0.8;
-  const double DLT_WEIGHT = 0.2;
-  const double ORIENTATION_WEIGHT = 10.0;
+  const double DST_WEIGHT = 5.5;
+  const double DLT_WEIGHT = 0.8;
+  const double ORIENTATION_WEIGHT = 12.0;
 
   const double WIDTH_RATIO = target_image_width / (double)image.size().width;
   const double HEIGHT_RATIO = target_image_height / (double)image.size().height;
@@ -508,7 +517,7 @@ void PatchBasedWarping(const cv::Mat &image, Graph<glm::vec2> &target_graph, con
     hard_constraint.add(x[vertex_index * 2] == target_graph.vertices_[0].x);
 
     vertex_index = row * mesh_column_count + mesh_column_count - 1;
-    hard_constraint.add(x[vertex_index * 2] == target_image_width);
+    hard_constraint.add(x[vertex_index * 2] == target_graph.vertices_[0].x + target_image_width);
   }
 
   for (size_t column = 0; column < mesh_column_count; ++column) {
@@ -516,7 +525,7 @@ void PatchBasedWarping(const cv::Mat &image, Graph<glm::vec2> &target_graph, con
     hard_constraint.add(x[vertex_index * 2 + 1] == target_graph.vertices_[0].y);
 
     vertex_index = (mesh_row_count - 1) * mesh_column_count + column;
-    hard_constraint.add(x[vertex_index * 2 + 1] == target_image_height);
+    hard_constraint.add(x[vertex_index * 2 + 1] == target_graph.vertices_[0].y + target_image_height);
   }
 
   // Avoid flipping
@@ -541,7 +550,6 @@ void PatchBasedWarping(const cv::Mat &image, Graph<glm::vec2> &target_graph, con
   IloCplex cplex(model);
 
   cplex.setOut(env.getNullStream());
-
   if (!cplex.solve()) {
     std::cout << "Failed to optimize the model.\n";
   }

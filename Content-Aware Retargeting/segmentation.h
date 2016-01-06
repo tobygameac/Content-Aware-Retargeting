@@ -6,8 +6,9 @@
 #include <opencv2\core\core.hpp>
 #include <opencv2\highgui\highgui.hpp>
 
-#include "graph.h"
 #include "disjoint_set.h"
+#include "graph.h"
+#include "omp.h"
 
 void BuildGraphFromImage(const cv::Mat &image, Graph<glm::vec2> &target_graph) {
   target_graph = Graph<glm::vec2>();
@@ -53,10 +54,7 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
 
   DisjointSet vertex_disjoint_set(target_graph.vertices_.size());
 
-  std::vector<double> thresholds(target_graph.vertices_.size());
-  for (auto &threshold : thresholds) {
-    threshold = 1 / k;
-  }
+  std::vector<double> thresholds(target_graph.vertices_.size(), 1 / k);
 
   // Segmentation
   for (const auto &edge : target_graph.edges_) {
@@ -85,7 +83,9 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
 
   // Calculate the color of each group
   std::vector<cv::Vec3d> group_color(target_graph.vertices_.size());
+#pragma omp parallel for
   for (int r = 0; r < image.size().height; ++r) {
+#pragma omp parallel for
     for (int c = 0; c < image.size().width; ++c) {
       size_t index = r * image.size().width + c;
       size_t group = vertex_disjoint_set.FindGroup(index);
@@ -122,8 +122,10 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
     }
   }
 
-  for (size_t r = 0; r < image.size().height; ++r) {
-    for (size_t c = 0; c < image.size().width; ++c) {
+#pragma omp parallel for
+  for (int r = 0; r < image.size().height; ++r) {
+#pragma omp parallel for
+    for (int c = 0; c < image.size().width; ++c) {
       size_t index = r * image.size().width + c;
       size_t group = vertex_disjoint_set.FindGroup(index);
       size_t group_size = vertex_disjoint_set.SizeOfGroup(group);
@@ -140,7 +142,9 @@ cv::Mat Segmentation(const cv::Mat &image, Graph<glm::vec2> &target_graph, std::
   // Write the pixel value
   group_of_pixel = std::vector<std::vector<int> >(image.size().height, std::vector<int>(image.size().width));
 
+#pragma omp parallel for
   for (int r = 0; r < image.size().height; ++r) {
+#pragma omp parallel for
     for (int c = 0; c < image.size().width; ++c) {
       size_t index = r * image.size().width + c;
       size_t group = vertex_disjoint_set.FindGroup(index);

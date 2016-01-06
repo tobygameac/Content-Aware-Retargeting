@@ -43,8 +43,6 @@ namespace ContentAwareRetargeting {
 
   ProgramStatus program_status;
 
-  bool viewing_lines_mesh = false;
-
   const std::string DEFAULT_VERTEX_SHADER_FILE_PATH = "..\\shader\\vertex_shader.glsl";
   const std::string DEFAULT_FRAGMENT_SHADER_FILE_PATH = "..\\shader\\fragment_shader.glsl";
 
@@ -193,6 +191,10 @@ namespace ContentAwareRetargeting {
 
     void OnTrackBarsValueChanged(System::Object ^sender, System::EventArgs ^e);
 
+    void OnCheckBoxesCheckedChanged(System::Object ^sender, System::EventArgs ^e);
+
+    void OnNumericUpDownValueChanged(System::Object ^sender, System::EventArgs ^e);
+
   protected:
     /// <summary>
     /// Clean up any resources being used.
@@ -220,6 +222,10 @@ namespace ContentAwareRetargeting {
     System::Windows::Forms::Label ^original_size_label_;
     System::Windows::Forms::Label ^target_size_label_;
     System::Windows::Forms::Button ^start_button_;
+    System::Windows::Forms::CheckBox ^show_lines_check_box_;
+    System::Windows::Forms::CheckBox ^show_image_check_box_;
+    System::Windows::Forms::NumericUpDown^  target_width_numeric_up_down_;
+    System::Windows::Forms::NumericUpDown^  target_height_numeric_up_down_;
 
 
 #pragma region Windows Form Designer generated code
@@ -242,8 +248,14 @@ namespace ContentAwareRetargeting {
       this->original_size_label_ = (gcnew System::Windows::Forms::Label());
       this->target_size_label_ = (gcnew System::Windows::Forms::Label());
       this->start_button_ = (gcnew System::Windows::Forms::Button());
+      this->show_lines_check_box_ = (gcnew System::Windows::Forms::CheckBox());
+      this->show_image_check_box_ = (gcnew System::Windows::Forms::CheckBox());
+      this->target_width_numeric_up_down_ = (gcnew System::Windows::Forms::NumericUpDown());
+      this->target_height_numeric_up_down_ = (gcnew System::Windows::Forms::NumericUpDown());
       this->menu_strip_->SuspendLayout();
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->grid_size_track_bar_))->BeginInit();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_width_numeric_up_down_))->BeginInit();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_height_numeric_up_down_))->BeginInit();
       this->SuspendLayout();
       // 
       // gl_panel_
@@ -265,7 +277,7 @@ namespace ContentAwareRetargeting {
       this->menu_strip_->Name = L"menu_strip_";
       this->menu_strip_->Size = System::Drawing::Size(1084, 24);
       this->menu_strip_->TabIndex = 1;
-      this->menu_strip_->Text = L"menuStrip1";
+      this->menu_strip_->Text = L"Menu";
       // 
       // file_tool_strip_menu_item_
       // 
@@ -353,18 +365,58 @@ namespace ContentAwareRetargeting {
       // 
       // start_button_
       // 
-      this->start_button_->Location = System::Drawing::Point(15, 250);
+      this->start_button_->Location = System::Drawing::Point(15, 300);
       this->start_button_->Name = L"start_button_";
       this->start_button_->Size = System::Drawing::Size(100, 25);
       this->start_button_->TabIndex = 6;
       this->start_button_->Text = L"Start";
       this->start_button_->UseVisualStyleBackColor = true;
       // 
+      // show_lines_check_box_
+      // 
+      this->show_lines_check_box_->AutoSize = true;
+      this->show_lines_check_box_->Location = System::Drawing::Point(15, 225);
+      this->show_lines_check_box_->Name = L"show_lines_check_box_";
+      this->show_lines_check_box_->Size = System::Drawing::Size(51, 17);
+      this->show_lines_check_box_->TabIndex = 8;
+      this->show_lines_check_box_->Text = L"Lines";
+      this->show_lines_check_box_->UseVisualStyleBackColor = true;
+      // 
+      // show_image_check_box_
+      // 
+      this->show_image_check_box_->AutoSize = true;
+      this->show_image_check_box_->Checked = true;
+      this->show_image_check_box_->CheckState = System::Windows::Forms::CheckState::Checked;
+      this->show_image_check_box_->Location = System::Drawing::Point(15, 200);
+      this->show_image_check_box_->Name = L"show_image_check_box_";
+      this->show_image_check_box_->Size = System::Drawing::Size(55, 17);
+      this->show_image_check_box_->TabIndex = 9;
+      this->show_image_check_box_->Text = L"Image";
+      this->show_image_check_box_->UseVisualStyleBackColor = true;
+      // 
+      // target_width_numeric_up_down_
+      // 
+      this->target_width_numeric_up_down_->Location = System::Drawing::Point(15, 350);
+      this->target_width_numeric_up_down_->Name = L"target_width_numeric_up_down_";
+      this->target_width_numeric_up_down_->Size = System::Drawing::Size(120, 20);
+      this->target_width_numeric_up_down_->TabIndex = 13;
+      // 
+      // target_height_numeric_up_down_
+      // 
+      this->target_height_numeric_up_down_->Location = System::Drawing::Point(15, 375);
+      this->target_height_numeric_up_down_->Name = L"target_height_numeric_up_down_";
+      this->target_height_numeric_up_down_->Size = System::Drawing::Size(120, 20);
+      this->target_height_numeric_up_down_->TabIndex = 14;
+      // 
       // GLForm
       // 
       this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
       this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
       this->ClientSize = System::Drawing::Size(1084, 662);
+      this->Controls->Add(this->target_height_numeric_up_down_);
+      this->Controls->Add(this->target_width_numeric_up_down_);
+      this->Controls->Add(this->show_image_check_box_);
+      this->Controls->Add(this->show_lines_check_box_);
       this->Controls->Add(this->start_button_);
       this->Controls->Add(this->target_size_label_);
       this->Controls->Add(this->original_size_label_);
@@ -379,6 +431,8 @@ namespace ContentAwareRetargeting {
       this->menu_strip_->ResumeLayout(false);
       this->menu_strip_->PerformLayout();
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->grid_size_track_bar_))->EndInit();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_width_numeric_up_down_))->EndInit();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_height_numeric_up_down_))->EndInit();
       this->ResumeLayout(false);
       this->PerformLayout();
 
