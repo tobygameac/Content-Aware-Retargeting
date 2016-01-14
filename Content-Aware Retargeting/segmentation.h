@@ -85,9 +85,7 @@ namespace ContentAwareRetargeting {
 
     // Calculate the color of each group
     std::vector<cv::Vec3d> group_color(target_graph.vertices_.size());
-#pragma omp parallel for
     for (int r = 0; r < image.size().height; ++r) {
-#pragma omp parallel for
       for (int c = 0; c < image.size().width; ++c) {
         size_t index = r * image.size().width + c;
         size_t group = vertex_disjoint_set.FindGroup(index);
@@ -124,9 +122,7 @@ namespace ContentAwareRetargeting {
       }
     }
 
-#pragma omp parallel for
     for (int r = 0; r < image.size().height; ++r) {
-#pragma omp parallel for
       for (int c = 0; c < image.size().width; ++c) {
         size_t index = r * image.size().width + c;
         size_t group = vertex_disjoint_set.FindGroup(index);

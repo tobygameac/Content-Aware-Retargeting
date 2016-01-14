@@ -192,7 +192,7 @@ namespace ContentAwareRetargeting {
         const std::size_t object_index = edge_index_list_of_object_iterator->first;
         const std::vector<size_t> &edge_index_list = edge_index_list_of_object_iterator->second;
 
-        const double OBJECT_SIZE_WEIGHT = 1.0 / (double)edge_index_list.size();
+        const double OBJECT_SIZE_WEIGHT = sqrt(1.0 / (double)edge_index_list.size());
         //const double OBJECT_SIZE_WEIGHT = 1.0;
 
         if (first_appear_group_list.find(object_index) == first_appear_group_list.end()) {
@@ -228,7 +228,7 @@ namespace ContentAwareRetargeting {
         const std::size_t object_index = edge_index_list_of_object_iterator->first;
         const std::vector<size_t> &edge_index_list = edge_index_list_of_object_iterator->second;
 
-        const double OBJECT_SIZE_WEIGHT = 1.0 / (double)edge_index_list.size();
+        const double OBJECT_SIZE_WEIGHT = sqrt(1.0 / (double)edge_index_list.size());
         //const double OBJECT_SIZE_WEIGHT = 1.0;
 
         if (!edge_index_list.size()) {
@@ -430,7 +430,7 @@ namespace ContentAwareRetargeting {
     // Patch transformation constraint
     for (size_t patch_index = 0; patch_index < edge_index_list_of_patch.size(); ++patch_index) {
       const std::vector<size_t> &edge_index_list = edge_index_list_of_patch[patch_index];
-      const double PATCH_SIZE_WEIGHT = 1.0 / (double)edge_index_list.size();
+      const double PATCH_SIZE_WEIGHT = sqrt(1.0 / (double)edge_index_list.size());
       //const double PATCH_SIZE_WEIGHT = 1.0;
 
       if (!edge_index_list.size()) {
