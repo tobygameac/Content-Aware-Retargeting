@@ -207,8 +207,8 @@ namespace ContentAwareRetargeting {
 
   private:
 
-    System::Windows::Forms::Panel ^gl_panel_;
     System::ComponentModel::Container ^components;
+    System::Windows::Forms::Panel ^gl_panel_;
     System::Windows::Forms::MenuStrip ^menu_strip_;
     System::Windows::Forms::ToolStripMenuItem ^file_tool_strip_menu_item_;
     System::Windows::Forms::ToolStripMenuItem ^mode_tool_strip_menu_item_;
@@ -224,8 +224,8 @@ namespace ContentAwareRetargeting {
     System::Windows::Forms::Button ^start_button_;
     System::Windows::Forms::CheckBox ^show_lines_check_box_;
     System::Windows::Forms::CheckBox ^show_image_check_box_;
-    System::Windows::Forms::NumericUpDown^  target_width_numeric_up_down_;
-    System::Windows::Forms::NumericUpDown^  target_height_numeric_up_down_;
+    System::Windows::Forms::NumericUpDown ^target_width_numeric_up_down_;
+    System::Windows::Forms::NumericUpDown ^target_height_numeric_up_down_;
 
 
 #pragma region Windows Form Designer generated code

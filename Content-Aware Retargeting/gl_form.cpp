@@ -7,9 +7,6 @@ namespace ContentAwareRetargeting {
 
   [STAThread]
   int main(array<String^> ^args) {
-
-    //std::string input_file_name = "leaf.bmp";
-
     Application::EnableVisualStyles();
     Application::SetCompatibleTextRenderingDefault(false);
     ContentAwareRetargeting::GLForm form;
@@ -22,9 +19,9 @@ namespace ContentAwareRetargeting {
 
     //GroundTruthData();
 
-    srand((unsigned)time(0));
-
     InitializeOpenGL();
+
+    srand((unsigned)time(0));
 
     ChangeProgramStatus(IDLE);
 
@@ -47,7 +44,7 @@ namespace ContentAwareRetargeting {
 
     show_image_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
     show_lines_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
-    
+
     target_width_numeric_up_down_->Minimum = MIN_PANEL_WIDTH;
     target_width_numeric_up_down_->Maximum = MAX_PANEL_WIDTH;
 
@@ -352,14 +349,14 @@ namespace ContentAwareRetargeting {
     }
 
     if (!data_for_image_warping_were_generated) {
-      puts("Start : Gaussian smoothing");
+      std::cout << "Start : Gaussian smoothing\n";
       const double SMOOTH_SIGMA = 0.8;
       const cv::Size K_SIZE(3, 3);
       cv::GaussianBlur(source_image, source_image_after_smoothing, K_SIZE, SMOOTH_SIGMA);
       cv::imwrite(source_image_file_directory + "smooth_" + source_image_file_name, source_image_after_smoothing);
-      puts("Done : Gaussian smoothing");
+      std::cout << "Done : Gaussian smoothing\n";
 
-      puts("Start : Image segmentation");
+      std::cout << "Start : Image segmentation\n";
       //const double SEGMENTATION_K = (source_image.size().width + source_image.size().height) / 1.75;
       const double SEGMENTATION_K = pow(source_image.size().width * source_image.size().height, 0.6);
       const double SEGMENTATION_MIN_PATCH_SIZE = (source_image.size().width * source_image.size().height) * 0.001;
@@ -367,9 +364,9 @@ namespace ContentAwareRetargeting {
 
       source_image_after_segmentation = Segmentation(source_image, image_graph, group_of_pixel, SEGMENTATION_K, SEGMENTATION_MIN_PATCH_SIZE, SEGMENTATION_SIMILAR_COLOR_MERGE_THRESHOLD);
       cv::imwrite(source_image_file_directory + "segmentation_" + source_image_file_name + ".png", source_image_after_segmentation);
-      puts("Done : Image segmentation");
+      std::cout << "Done : Image segmentation\n";
 
-      puts("Start : Image saliency calculation");
+      std::cout << "Start : Image saliency calculation\n";
       const double SALIENCY_C = 3;
       const double SALIENCY_K = 64;
       saliency_map_of_source_image = CalculateContextAwareSaliencyMapWithMatlabProgram(source_image, saliency_map, source_image_file_directory + source_image_file_name, source_image_file_directory + "saliency_" + source_image_file_name + ".png");
@@ -414,26 +411,27 @@ namespace ContentAwareRetargeting {
       }
       cv::imwrite(source_image_file_directory + "significance_" + source_image_file_name + ".png", significance_map_of_source_image);
 
-      puts("Done : Image saliency calculation");
+      std::cout << "Done : Image saliency calculation\n";
 
       data_for_image_warping_were_generated = true;
     }
 
-    puts("Start : Build mesh and graph");
+    std::cout << "Start : Build mesh and graph\n";
     BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, grid_size);
-    puts("Done : Build mesh and graph");
+    std::cout << "Done : Build mesh and graph\n";
 
     //if (program_mode == PATCH_BASED_WARPING) {
 
-    puts("Start : Patch based warping");
+    std::cout << "Start : Patch based warping\n";
     PatchBasedWarping(source_image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, grid_size, grid_size);
-    puts("Done : Patch based warping");
-    printf("New image size : %d %d\n", target_image_width, target_image_height);
+    std::cout << "Done : Patch based warping\n";
+    
+    std::cout << "New image size : " << target_image_width << " " << target_image_height << "\n";
     //} else if (program_mode == FOCUS_WARPING) {
-    //  puts("Start : Focus warping");
+    //  std::cout << "Start : Focus warping\n";
     //  FocusWarping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height, focus_mesh_scale, focus_x, focus_y);
-    //  puts("Done : Focus warping");
-    //  printf("New image size : %d %d\n", target_image_width, target_image_height);
+    //  std::cout << "Done : Focus warping\n";
+    //  std::cout << "New image size : " << target_image_width << " " << target_image_height << "\n";
     //}
 
     saliency_of_mesh_vertex.clear();

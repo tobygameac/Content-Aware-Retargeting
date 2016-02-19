@@ -570,7 +570,7 @@ namespace ContentAwareRetargeting {
 
   void FocusWarping(const cv::Mat &image, Graph<glm::vec2> &target_graph, const std::vector<std::vector<int> > &group_of_pixel, const std::vector<double> &saliency_of_patch, const int target_image_width, const int target_image_height, const double mesh_width, const double mesh_height, const double max_mesh_scale, const double focus_x, const double focus_y) {
     if (target_image_width <= 0 || target_image_height <= 0) {
-      printf("Wrong target image size (%d x %d)\n", target_image_width, target_image_height);
+      std::cout << "Wrong target image size (" << target_image_width << " x " << target_image_height << ")\n";
       return;
     }
 
@@ -678,7 +678,7 @@ namespace ContentAwareRetargeting {
     cplex.setOut(env.getNullStream());
 
     if (!cplex.solve()) {
-      puts("Failed to optimize the model.");
+      std::cout << "Failed to optimize the model.\n";
     }
 
     IloNumArray result(env);

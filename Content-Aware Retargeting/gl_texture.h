@@ -8,6 +8,8 @@ namespace ContentAwareRetargeting {
   namespace GLTexture {
 
     void SetGLTexture(void *image_data_pointer, int width, int height, GLuint *texture_id) {
+      glDeleteTextures(1, texture_id);
+
       glGenTextures(1, texture_id);
       glBindTexture(GL_TEXTURE_2D, *texture_id);
 
