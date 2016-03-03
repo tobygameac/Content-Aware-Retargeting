@@ -39,7 +39,7 @@ namespace ContentAwareRetargeting {
     this->KeyDown += gcnew System::Windows::Forms::KeyEventHandler(this, &ContentAwareRetargeting::GLForm::OnKeyDown);
 
     grid_size_track_bar_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnTrackBarsValueChanged);
-    current_grid_size = grid_size_track_bar_->Value;
+    grid_size_track_bar_->Value = current_grid_size;
     grid_size_label_->Text = "Grid size : " + current_grid_size;
 
     show_image_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
@@ -343,11 +343,7 @@ namespace ContentAwareRetargeting {
     target_mesh.colors_ = std::vector<glm::vec3>(target_mesh.vertices_.size(), glm::vec3(255, 0, 0));
   }
 
-  void GLForm::ContentAwareImageRetargeting(const int target_image_width, const int target_image_height, const float grid_size) {
-    if (!source_image.size().width || !source_image.size().height) {
-      return;
-    }
-
+  void GLForm::GenerateDataForImageWarping() {
     if (!data_for_image_warping_were_generated) {
       std::cout << "Start : Gaussian smoothing\n";
       const double SMOOTH_SIGMA = 0.8;
@@ -415,6 +411,14 @@ namespace ContentAwareRetargeting {
 
       data_for_image_warping_were_generated = true;
     }
+  }
+
+  void GLForm::ContentAwareImageRetargeting(const int target_image_width, const int target_image_height, const float grid_size) {
+    if (!source_image.size().width || !source_image.size().height) {
+      return;
+    }
+
+    GenerateDataForImageWarping();
 
     std::cout << "Start : Build mesh and graph\n";
     BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, grid_size);
@@ -484,7 +488,6 @@ namespace ContentAwareRetargeting {
     if (!source_video_frames.size() || !source_video_frames[0].size().height || !source_video_frames[0].size().width) {
       return;
     }
-
 
     const std::string linear_video_path = source_video_file_directory + "linear_" + source_video_file_name + ".avi";
     cv::VideoWriter linear_video_writer;
@@ -718,6 +721,77 @@ namespace ContentAwareRetargeting {
     }
   }
 
+  void GLForm::ImageFocusWarping(const int target_image_width, const int target_image_height, const float grid_size) {
+    if (!source_image.size().width || !source_image.size().height) {
+      return;
+    }
+
+    GenerateDataForImageWarping();
+
+    std::cout << "Start : Build mesh and graph\n";
+    BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, grid_size);
+    std::cout << "Done : Build mesh and graph\n";
+
+    //if (program_mode == PATCH_BASED_WARPING) {
+
+    std::cout << "Start : Focus warping\n";
+    FocusWarping(source_image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, grid_size, grid_size, focus_grid_scale, focus_position_x, focus_position_y);
+    std::cout << "Done : Focus warping\n";
+
+    std::cout << "New image size : " << target_image_width << " " << target_image_height << "\n";
+    //} else if (program_mode == FOCUS_WARPING) {
+    //  std::cout << "Start : Focus warping\n";
+    //  FocusWarping(image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, mesh_width, mesh_height, focus_mesh_scale, focus_x, focus_y);
+    //  std::cout << "Done : Focus warping\n";
+    //  std::cout << "New image size : " << target_image_width << " " << target_image_height << "\n";
+    //}
+
+    saliency_of_mesh_vertex.clear();
+    saliency_of_mesh_vertex = std::vector<double>(image_graph.vertices_.size());
+
+    for (size_t vertex_index = 0; vertex_index < image_graph.vertices_.size(); ++vertex_index) {
+      float original_x = gl_panel_image_mesh.vertices_[vertex_index].x;
+      float original_y = gl_panel_image_mesh.vertices_[vertex_index].y;
+      saliency_of_mesh_vertex[vertex_index] = saliency_of_patch[group_of_pixel[original_y][original_x]];
+    }
+
+    int mesh_column_count = (int)(source_image.size().width / grid_size) + 1;
+    int mesh_row_count = (int)(source_image.size().height / grid_size) + 1;
+
+    float real_mesh_width = source_image.size().width / (float)(mesh_column_count - 1);
+    float real_mesh_height = source_image.size().height / (float)(mesh_row_count - 1);
+
+    gl_panel_image_mesh.vertices_.clear();
+
+    for (int r = 0; r < mesh_row_count - 1; ++r) {
+      for (int c = 0; c < mesh_column_count - 1; ++c) {
+        std::vector<size_t> vertex_indices;
+
+        size_t base_index = r * (mesh_column_count)+c;
+        vertex_indices.push_back(base_index);
+        vertex_indices.push_back(base_index + mesh_column_count);
+        vertex_indices.push_back(base_index + mesh_column_count + 1);
+        vertex_indices.push_back(base_index + 1);
+
+        for (const auto &vertex_index : vertex_indices) {
+          gl_panel_image_mesh.vertices_.push_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
+        }
+      }
+    }
+
+    GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
+
+    gl_panel_image_mesh.Upload();
+
+    BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
+    gl_panel_lines_mesh.Upload();
+
+    //double cotanget_of_half_of_fovy = 1.0 / tan(glm::radians(FOVY / 2.0f));
+    //eye_position.z = cotanget_of_half_of_fovy * (target_image_height / 2.0);
+
+    RenderGLPanel();
+  }
+
   cv::Vec3b GLForm::SaliencyValueToSignifanceColor(double saliency_value) {
     cv::Vec3b signifance_color(0, 0, 0);
 
@@ -777,7 +851,8 @@ namespace ContentAwareRetargeting {
 
         data_for_image_warping_were_generated = false;
 
-        ChangeProgramStatus(ProgramStatus::IMAGE_RETARGETING);
+        //ChangeProgramStatus(ProgramStatus::IMAGE_RETARGETING);
+        ChangeProgramStatus(ProgramStatus::IMAGE_FOCUS);
       }
 
     } else if (sender == open_video_file_tool_strip_menu_item_) {
@@ -892,6 +967,17 @@ namespace ContentAwareRetargeting {
         //gl_panel_lines_mesh.Upload();
 
       }
+      
+      if (program_status == ProgramStatus::IMAGE_FOCUS) {
+        double new_focus_position_x = e->X;
+        double new_focus_position_y = gl_panel_->Height - e->Y;
+        if (std::abs(new_focus_position_x - focus_position_x) >= 1 || std::abs(new_focus_position_y - focus_position_y) >= 1) {
+          ImageFocusWarping(gl_panel_->Width, gl_panel_->Height, current_grid_size);
+        }
+        focus_position_x = new_focus_position_x;
+        focus_position_y = new_focus_position_y;
+      }
+
       RenderGLPanel();
     }
   }
@@ -944,6 +1030,10 @@ namespace ContentAwareRetargeting {
   void GLForm::OnTrackBarsValueChanged(System::Object ^sender, System::EventArgs ^e) {
     if (sender == grid_size_track_bar_) {
       current_grid_size = grid_size_track_bar_->Value;
+      if (program_status == ProgramStatus::IMAGE_FOCUS) {
+        current_grid_size = std::max(MIN_GRID_SIZE_WHEN_FOCUS, current_grid_size);
+        grid_size_track_bar_->Value = current_grid_size;
+      }
       grid_size_label_->Text = "Grid size : " + current_grid_size;
     }
   }

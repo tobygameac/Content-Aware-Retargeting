@@ -38,7 +38,8 @@ namespace ContentAwareRetargeting {
   enum ProgramStatus {
     IDLE,
     IMAGE_RETARGETING,
-    VIDEO_RETARGETING
+    VIDEO_RETARGETING,
+    IMAGE_FOCUS
   };
 
   ProgramStatus program_status;
@@ -81,7 +82,7 @@ namespace ContentAwareRetargeting {
   const int MAX_PANEL_WIDTH = 1 << 12;
   const int MAX_PANEL_HEIGHT = 1 << 12;
 
-  std::chrono::steady_clock::time_point last_clock = std::chrono::steady_clock::now();
+  auto last_clock = std::chrono::high_resolution_clock::now();
 
   std::string source_image_file_directory;
   std::string source_image_file_name;
@@ -107,9 +108,13 @@ namespace ContentAwareRetargeting {
   const float GRID_LINE_WIDTH = 4.5;
   const float GRID_POINT_SIZE = 7.5;
 
-  float current_grid_size = 20;
+  float current_grid_size = 50;
 
-  float current_focus_grid_scale = 3.5;
+  const float MIN_GRID_SIZE_WHEN_FOCUS = 50;
+
+  double focus_grid_scale = 3.5;
+  double focus_position_x;
+  double focus_position_y;
 
   bool is_viewing_mesh = true;
   bool is_viewing_mesh_point = false;
@@ -171,9 +176,13 @@ namespace ContentAwareRetargeting {
 
     void BuildLinesMeshFromGridMesh(const GLMesh &source_mesh, GLMesh &target_mesh);
 
+    void GenerateDataForImageWarping();
+
     void ContentAwareImageRetargeting(const int target_image_width, const int target_image_height, const float grid_size);
 
     void ContentAwareVideoRetargetingUsingObjectPreservingWarping(const int target_video_width, const int target_video_height, const float grid_size);
+
+    void ImageFocusWarping(const int target_image_width, const int target_image_height, const float grid_size);
 
     cv::Vec3b SaliencyValueToSignifanceColor(double saliency_value);
 
