@@ -574,6 +574,9 @@ namespace ContentAwareRetargeting {
       return;
     }
 
+    double width_scale = target_image_width / (double)image.cols;
+    double height_scale = target_image_height / (double)image.rows;
+
     IloEnv env;
 
     IloNumVarArray x(env);
@@ -609,9 +612,9 @@ namespace ContentAwareRetargeting {
       distance_weight = pow(distance_weight, 4.0);
 
       if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
-        expr += FOCUS_WEIGHT * distance_weight * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - max_mesh_scale * delta_x, 2);
+        expr += FOCUS_WEIGHT * distance_weight * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - max_mesh_scale * width_scale * delta_x, 2);
       } else {
-        expr += FOCUS_WEIGHT * distance_weight * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - max_mesh_scale * delta_y, 2);
+        expr += FOCUS_WEIGHT * distance_weight * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - max_mesh_scale * height_scale * delta_y, 2);
       }
     }
 
@@ -623,10 +626,10 @@ namespace ContentAwareRetargeting {
       float delta_y = target_graph.vertices_[vertex_index_1].y - target_graph.vertices_[vertex_index_2].y;
       if (std::abs(delta_x) > std::abs(delta_y)) { // Horizontal
         expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1], 2);
-        expr += DISTORTION_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - delta_x, 2);
+        expr += DISTORTION_WEIGHT * IloPower((x[vertex_index_1 * 2] - x[vertex_index_2 * 2]) - width_scale * delta_x, 2);
       } else {
         expr += ORIENTATION_WEIGHT * IloPower(x[vertex_index_1 * 2] - x[vertex_index_2 * 2], 2);
-        expr += DISTORTION_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - delta_y, 2);
+        expr += DISTORTION_WEIGHT * IloPower((x[vertex_index_1 * 2 + 1] - x[vertex_index_2 * 2 + 1]) - height_scale * delta_y, 2);
       }
     }
 

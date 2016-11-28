@@ -40,10 +40,13 @@ namespace ContentAwareRetargeting {
 
     grid_size_track_bar_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnTrackBarsValueChanged);
     grid_size_track_bar_->Value = current_grid_size;
-    grid_size_label_->Text = "Grid size : " + current_grid_size;
+
+    focus_scale_track_bar_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnTrackBarsValueChanged);
+    focus_scale_track_bar_->Value = focus_scale_track_bar_->Value + 1; // Trigger value changed event to rename the label
 
     show_image_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
     show_lines_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
+    focus_check_box_->CheckedChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnCheckBoxesCheckedChanged);
 
     target_width_numeric_up_down_->Minimum = MIN_PANEL_WIDTH;
     target_width_numeric_up_down_->Maximum = MAX_PANEL_WIDTH;
@@ -198,7 +201,7 @@ namespace ContentAwareRetargeting {
   }
 
   void GLForm::RenderGLPanel() {
-    wglMakeCurrent(hdc, hrc);
+    //wglMakeCurrent(hdc, hrc);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -215,12 +218,38 @@ namespace ContentAwareRetargeting {
     glUniformMatrix4fv(shader_uniform_projection_matrix_id, 1, GL_FALSE, glm::value_ptr(projection_matrix));
     glUniformMatrix4fv(shader_uniform_view_matrix_id, 1, GL_FALSE, glm::value_ptr(view_matrix));
 
-    if (show_lines_check_box_->Checked) {
-      gl_panel_lines_mesh.Draw(modelview_matrix);
-    }
+    if (is_demo_triangle) {
 
-    if (show_image_check_box_->Checked) {
-      gl_panel_image_mesh.Draw(modelview_matrix);
+      if (show_lines_check_box_->Checked) {
+        //gl_panel_image_triangle_lines_mesh.Draw(modelview_matrix);
+        gl_panel_image_triangle_mesh.texture_flag_ = false;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        gl_panel_image_triangle_mesh.Draw(modelview_matrix);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        gl_panel_image_triangle_mesh.texture_flag_ = true;        
+      }
+
+      if (show_image_check_box_->Checked) {
+        gl_panel_image_triangle_mesh.Draw(modelview_matrix);
+      }
+
+    } else {
+
+      if (show_lines_check_box_->Checked) {
+        gl_panel_image_mesh.texture_flag_ = false;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        gl_panel_image_mesh.Draw(modelview_matrix);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        gl_panel_image_mesh.texture_flag_ = true;
+      }
+
+      if (show_image_check_box_->Checked) {
+        gl_panel_image_mesh.Draw(modelview_matrix);
+      }
     }
 
     SwapBuffers(hdc);
@@ -322,25 +351,53 @@ namespace ContentAwareRetargeting {
     }
   }
 
-  void GLForm::BuildLinesMeshFromGridMesh(const GLMesh &source_mesh, GLMesh &target_mesh) {
+  void GLForm::BuildTriangleMesh(const cv::Mat &image, GLMesh &target_mesh, const float triangle_size) {
+    
+    triangulateio in, out;
+
+    memset(&in, 0, sizeof(triangulateio));
+    memset(&out, 0, sizeof(triangulateio));
+
+    in.numberofpoints = 4;
+    in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
+
+    in.pointlist[0] = 0;
+    in.pointlist[1] = 0;
+
+    in.pointlist[2] = 0;
+    in.pointlist[3] = image.rows;
+
+    in.pointlist[4] = image.cols;
+    in.pointlist[5] = image.rows;
+
+    in.pointlist[6] = image.cols;
+    in.pointlist[7] = 0;
+
+    char triangulate_instruction[100] = "";
+    //sprintf(triangulate_instruction, "pqzQ");
+    //sprintf(triangulate_instruction, "qa1000zQ");
+
+    sprintf(triangulate_instruction, "qa%dzQ", (int)triangle_size);
+    triangulate(triangulate_instruction, &in, &out, NULL);
+
     target_mesh = GLMesh();
-    target_mesh.vertices_type = GL_LINES;
+    target_mesh.vertices_type = GL_TRIANGLES;
 
-    for (size_t vertex_index = 0; vertex_index < source_mesh.vertices_.size(); vertex_index += 4) {
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index]);
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 1]);
-
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 1]);
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 2]);
-
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 2]);
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 3]);
-
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index + 3]);
-      target_mesh.vertices_.push_back(source_mesh.vertices_[vertex_index]);
+    for (int i = 0; i < out.numberoftriangles; ++i) {
+      for (int j = 0; j < out.numberofcorners; ++j) {
+        int target_vertex_index = out.trianglelist[i * out.numberofcorners + j];
+        glm::vec3 vertex(out.pointlist[target_vertex_index * 2], out.pointlist[target_vertex_index * 2 + 1], 0);
+        target_mesh.vertices_.push_back(vertex);
+        glm::vec2 uv(vertex.x / (double)image.size().width, vertex.y / (double)image.size().height);
+        target_mesh.uvs_.push_back(uv);
+      }
     }
 
-    target_mesh.colors_ = std::vector<glm::vec3>(target_mesh.vertices_.size(), glm::vec3(255, 0, 0));
+    free(in.pointlist);
+    free(out.pointlist);
+    free(out.pointattributelist);
+    free(out.trianglelist);
+    free(out.triangleattributelist);
   }
 
   void GLForm::GenerateDataForImageWarping() {
@@ -429,7 +486,7 @@ namespace ContentAwareRetargeting {
     std::cout << "Start : Patch based warping\n";
     PatchBasedWarping(source_image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, grid_size, grid_size);
     std::cout << "Done : Patch based warping\n";
-    
+
     std::cout << "New image size : " << target_image_width << " " << target_image_height << "\n";
     //} else if (program_mode == FOCUS_WARPING) {
     //  std::cout << "Start : Focus warping\n";
@@ -471,12 +528,11 @@ namespace ContentAwareRetargeting {
       }
     }
 
+    gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+
     GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
 
     gl_panel_image_mesh.Upload();
-
-    BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
-    gl_panel_lines_mesh.Upload();
 
     //double cotanget_of_half_of_fovy = 1.0 / tan(glm::radians(FOVY / 2.0f));
     //eye_position.z = cotanget_of_half_of_fovy * (target_image_height / 2.0);
@@ -705,11 +761,10 @@ namespace ContentAwareRetargeting {
         }
       }
 
+      gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+
       GLTexture::SetGLTexture(source_video_frames[t], &gl_panel_image_mesh.texture_id_);
       gl_panel_image_mesh.Upload();
-
-      BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
-      gl_panel_lines_mesh.Upload();
 
       RenderGLPanel();
 
@@ -734,6 +789,7 @@ namespace ContentAwareRetargeting {
 
     //if (program_mode == PATCH_BASED_WARPING) {
 
+    double focus_grid_scale = focus_scale_track_bar_->Value * focus_grid_scale_modifier;
     std::cout << "Start : Focus warping\n";
     FocusWarping(source_image, image_graph, group_of_pixel, saliency_of_patch, target_image_width, target_image_height, grid_size, grid_size, focus_grid_scale, focus_position_x, focus_position_y);
     std::cout << "Done : Focus warping\n";
@@ -779,12 +835,11 @@ namespace ContentAwareRetargeting {
       }
     }
 
+    gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+
     GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
 
     gl_panel_image_mesh.Upload();
-
-    BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
-    gl_panel_lines_mesh.Upload();
 
     //double cotanget_of_half_of_fovy = 1.0 / tan(glm::radians(FOVY / 2.0f));
     //eye_position.z = cotanget_of_half_of_fovy * (target_image_height / 2.0);
@@ -840,16 +895,17 @@ namespace ContentAwareRetargeting {
 
         BuildGridMeshAndGraphForImage(source_image, gl_panel_image_mesh, image_graph, current_grid_size);
 
+        gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+
         GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
 
         gl_panel_image_mesh.Upload();
 
-        BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
-        gl_panel_lines_mesh.Upload();
-
         RenderGLPanel();
 
         data_for_image_warping_were_generated = false;
+
+        //is_demo_triangle = true;
 
         //ChangeProgramStatus(ProgramStatus::IMAGE_RETARGETING);
         ChangeProgramStatus(ProgramStatus::IMAGE_FOCUS);
@@ -888,12 +944,11 @@ namespace ContentAwareRetargeting {
 
           BuildGridMeshAndGraphForImage(source_video_frames[0], gl_panel_image_mesh, image_graph, current_grid_size);
 
+          gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+
           GLTexture::SetGLTexture(source_video_frames[0], &gl_panel_image_mesh.texture_id_);
 
           gl_panel_image_mesh.Upload();
-
-          BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
-          gl_panel_lines_mesh.Upload();
 
           RenderGLPanel();
         }
@@ -963,11 +1018,11 @@ namespace ContentAwareRetargeting {
 
         //gl_panel_image_mesh.Upload();
 
-        //BuildLinesMeshFromGridMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
+        //BuildLinesMeshFromMesh(gl_panel_image_mesh, gl_panel_lines_mesh);
         //gl_panel_lines_mesh.Upload();
 
       }
-      
+
       if (program_status == ProgramStatus::IMAGE_FOCUS) {
         double new_focus_position_x = e->X;
         double new_focus_position_y = gl_panel_->Height - e->Y;
@@ -976,6 +1031,15 @@ namespace ContentAwareRetargeting {
         }
         focus_position_x = new_focus_position_x;
         focus_position_y = new_focus_position_y;
+      }
+
+      if (is_demo_triangle) {
+        BuildTriangleMesh(source_image, gl_panel_image_triangle_mesh, current_grid_size * 10);
+
+        gl_panel_image_triangle_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_triangle_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+
+        GLTexture::SetGLTexture(source_image, &gl_panel_image_triangle_mesh.texture_id_);
+        gl_panel_image_triangle_mesh.Upload();
       }
 
       RenderGLPanel();
@@ -1022,6 +1086,11 @@ namespace ContentAwareRetargeting {
     case Keys::L:
       show_lines_check_box_->Checked = !show_lines_check_box_->Checked;
       break;
+    case Keys::T:
+      if (!source_image.empty()) {
+        is_demo_triangle = !is_demo_triangle;
+      }
+      break;
     }
 
     RenderGLPanel();
@@ -1035,10 +1104,23 @@ namespace ContentAwareRetargeting {
         grid_size_track_bar_->Value = current_grid_size;
       }
       grid_size_label_->Text = "Grid size : " + current_grid_size;
+    } else if (sender == focus_scale_track_bar_) {
+      double focus_scale = focus_scale_track_bar_->Value * focus_grid_scale_modifier;
+      focus_scale_label_->Text = "Focus scale : " + focus_scale;
     }
+    RenderGLPanel();
   }
 
   void GLForm::OnCheckBoxesCheckedChanged(System::Object ^sender, System::EventArgs ^e) {
+    if (sender == focus_check_box_) {
+      if (focus_check_box_->Checked) {
+        program_status = ProgramStatus::IMAGE_FOCUS;
+        current_grid_size = std::max(MIN_GRID_SIZE_WHEN_FOCUS, current_grid_size);
+        grid_size_track_bar_->Value = current_grid_size;
+      } else if (program_status == ProgramStatus::IMAGE_FOCUS) {
+        program_status = ProgramStatus::IMAGE_RETARGETING;
+      }
+    }
     RenderGLPanel();
   }
 

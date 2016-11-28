@@ -128,13 +128,13 @@ namespace ContentAwareRetargeting {
     GLuint texture_id_;
     GLuint vertices_type;
 
+    bool texture_flag_;
+
   private:
 
     GLuint vbo_vertices_;
     GLuint vbo_colors_;
     GLuint vbo_uvs_;
-
-    bool texture_flag_;
 
     glm::mat4 local_modelview_matrix_;
   };

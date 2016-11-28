@@ -27,6 +27,7 @@
 #include "gl_texture.h"
 #include "saliency.h"
 #include "segmentation.h"
+#include "triangle.h"
 #include "video_segmentation.h"
 #include "warping.h"
 
@@ -103,7 +104,8 @@ namespace ContentAwareRetargeting {
   int source_video_fourcc;
 
   GLMesh gl_panel_image_mesh;
-  GLMesh gl_panel_lines_mesh;
+
+  GLMesh gl_panel_image_triangle_mesh;
 
   const float GRID_LINE_WIDTH = 4.5;
   const float GRID_POINT_SIZE = 7.5;
@@ -112,12 +114,14 @@ namespace ContentAwareRetargeting {
 
   const float MIN_GRID_SIZE_WHEN_FOCUS = 50;
 
-  double focus_grid_scale = 3.5;
+  double focus_grid_scale_modifier = 0.234;
   double focus_position_x;
   double focus_position_y;
 
   bool is_viewing_mesh = true;
   bool is_viewing_mesh_point = false;
+
+  bool is_demo_triangle = false;
 
   Graph<glm::vec2> image_graph;
   std::vector<std::vector<int> > group_of_pixel;
@@ -174,7 +178,7 @@ namespace ContentAwareRetargeting {
 
     void BuildGridMeshAndGraphForImage(const cv::Mat &image, GLMesh &target_mesh, Graph<glm::vec2> &G, float grid_size);
 
-    void BuildLinesMeshFromGridMesh(const GLMesh &source_mesh, GLMesh &target_mesh);
+    void BuildTriangleMesh(const cv::Mat &image, GLMesh &target_mesh, const float triangle_size);
 
     void GenerateDataForImageWarping();
 
@@ -227,15 +231,17 @@ namespace ContentAwareRetargeting {
     System::Windows::Forms::ToolStripMenuItem ^save_screen_tool_strip_menu_item_;
     System::Windows::Forms::ToolStripMenuItem ^record_screen_tool_strip_menu_item_;
     System::Windows::Forms::TrackBar ^grid_size_track_bar_;
+    System::Windows::Forms::TrackBar ^focus_scale_track_bar_;
     System::Windows::Forms::Label ^grid_size_label_;
+    System::Windows::Forms::Label ^focus_scale_label_;
     System::Windows::Forms::Label ^original_size_label_;
     System::Windows::Forms::Label ^target_size_label_;
     System::Windows::Forms::Button ^start_button_;
     System::Windows::Forms::CheckBox ^show_lines_check_box_;
     System::Windows::Forms::CheckBox ^show_image_check_box_;
+    System::Windows::Forms::CheckBox ^focus_check_box_;
     System::Windows::Forms::NumericUpDown ^target_width_numeric_up_down_;
     System::Windows::Forms::NumericUpDown ^target_height_numeric_up_down_;
-
 
 #pragma region Windows Form Designer generated code
     /// <summary>
@@ -261,10 +267,14 @@ namespace ContentAwareRetargeting {
       this->show_image_check_box_ = (gcnew System::Windows::Forms::CheckBox());
       this->target_width_numeric_up_down_ = (gcnew System::Windows::Forms::NumericUpDown());
       this->target_height_numeric_up_down_ = (gcnew System::Windows::Forms::NumericUpDown());
+      this->focus_scale_label_ = (gcnew System::Windows::Forms::Label());
+      this->focus_scale_track_bar_ = (gcnew System::Windows::Forms::TrackBar());
+      this->focus_check_box_ = (gcnew System::Windows::Forms::CheckBox());
       this->menu_strip_->SuspendLayout();
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->grid_size_track_bar_))->BeginInit();
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_width_numeric_up_down_))->BeginInit();
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_height_numeric_up_down_))->BeginInit();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->focus_scale_track_bar_))->BeginInit();
       this->SuspendLayout();
       // 
       // gl_panel_
@@ -384,7 +394,7 @@ namespace ContentAwareRetargeting {
       // show_lines_check_box_
       // 
       this->show_lines_check_box_->AutoSize = true;
-      this->show_lines_check_box_->Location = System::Drawing::Point(15, 225);
+      this->show_lines_check_box_->Location = System::Drawing::Point(15, 254);
       this->show_lines_check_box_->Name = L"show_lines_check_box_";
       this->show_lines_check_box_->Size = System::Drawing::Size(51, 17);
       this->show_lines_check_box_->TabIndex = 8;
@@ -396,7 +406,7 @@ namespace ContentAwareRetargeting {
       this->show_image_check_box_->AutoSize = true;
       this->show_image_check_box_->Checked = true;
       this->show_image_check_box_->CheckState = System::Windows::Forms::CheckState::Checked;
-      this->show_image_check_box_->Location = System::Drawing::Point(15, 200);
+      this->show_image_check_box_->Location = System::Drawing::Point(15, 231);
       this->show_image_check_box_->Name = L"show_image_check_box_";
       this->show_image_check_box_->Size = System::Drawing::Size(55, 17);
       this->show_image_check_box_->TabIndex = 9;
@@ -417,11 +427,46 @@ namespace ContentAwareRetargeting {
       this->target_height_numeric_up_down_->Size = System::Drawing::Size(120, 20);
       this->target_height_numeric_up_down_->TabIndex = 14;
       // 
+      // focus_scale_label_
+      // 
+      this->focus_scale_label_->AutoSize = true;
+      this->focus_scale_label_->Location = System::Drawing::Point(15, 210);
+      this->focus_scale_label_->Name = L"focus_scale_label_";
+      this->focus_scale_label_->Size = System::Drawing::Size(70, 13);
+      this->focus_scale_label_->TabIndex = 16;
+      this->focus_scale_label_->Text = L"Focus scale :";
+      // 
+      // focus_scale_track_bar_
+      // 
+      this->focus_scale_track_bar_->Location = System::Drawing::Point(10, 180);
+      this->focus_scale_track_bar_->Maximum = 100;
+      this->focus_scale_track_bar_->Minimum = -100;
+      this->focus_scale_track_bar_->Name = L"focus_scale_track_bar_";
+      this->focus_scale_track_bar_->Size = System::Drawing::Size(100, 45);
+      this->focus_scale_track_bar_->TabIndex = 15;
+      this->focus_scale_track_bar_->TickStyle = System::Windows::Forms::TickStyle::None;
+      this->focus_scale_track_bar_->Value = 15;
+      // 
+      // focus_check_box_
+      // 
+      this->focus_check_box_->AutoSize = true;
+      this->focus_check_box_->Checked = true;
+      this->focus_check_box_->CheckState = System::Windows::Forms::CheckState::Checked;
+      this->focus_check_box_->Location = System::Drawing::Point(15, 277);
+      this->focus_check_box_->Name = L"focus_check_box_";
+      this->focus_check_box_->Size = System::Drawing::Size(55, 17);
+      this->focus_check_box_->TabIndex = 17;
+      this->focus_check_box_->Text = L"Focus";
+      this->focus_check_box_->UseVisualStyleBackColor = true;
+      // 
       // GLForm
       // 
       this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
       this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
       this->ClientSize = System::Drawing::Size(1084, 662);
+      this->Controls->Add(this->focus_check_box_);
+      this->Controls->Add(this->focus_scale_label_);
+      this->Controls->Add(this->focus_scale_track_bar_);
       this->Controls->Add(this->target_height_numeric_up_down_);
       this->Controls->Add(this->target_width_numeric_up_down_);
       this->Controls->Add(this->show_image_check_box_);
@@ -433,6 +478,7 @@ namespace ContentAwareRetargeting {
       this->Controls->Add(this->grid_size_track_bar_);
       this->Controls->Add(this->gl_panel_);
       this->Controls->Add(this->menu_strip_);
+      this->DoubleBuffered = true;
       this->KeyPreview = true;
       this->MainMenuStrip = this->menu_strip_;
       this->Name = L"GLForm";
@@ -442,6 +488,7 @@ namespace ContentAwareRetargeting {
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->grid_size_track_bar_))->EndInit();
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_width_numeric_up_down_))->EndInit();
       (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->target_height_numeric_up_down_))->EndInit();
+      (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->focus_scale_track_bar_))->EndInit();
       this->ResumeLayout(false);
       this->PerformLayout();
 

@@ -144,6 +144,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gl_form.cpp" />
+    <ClCompile Include="triangle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="disjoint_set.h" />
@@ -155,6 +156,7 @@
     <ClInclude Include="graph.h" />
     <ClInclude Include="saliency.h" />
     <ClInclude Include="segmentation.h" />
+    <ClInclude Include="triangle.h" />
     <ClInclude Include="video_segmentation.h" />
     <ClInclude Include="warping.h" />
   </ItemGroup>
