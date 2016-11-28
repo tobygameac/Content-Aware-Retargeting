@@ -221,7 +221,6 @@ namespace ContentAwareRetargeting {
     if (is_demo_triangle) {
 
       if (show_lines_check_box_->Checked) {
-        //gl_panel_image_triangle_lines_mesh.Draw(modelview_matrix);
         gl_panel_image_triangle_mesh.texture_flag_ = false;
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 

@@ -1,4 +1,6 @@
 *.swp
+*.db
+*.opendb
 *.sdf
 *.opensdf
 *.log
