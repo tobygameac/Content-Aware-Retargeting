@@ -31,6 +31,12 @@ namespace ContentAwareRetargeting {
     GLMesh() : vbo_vertices_(0), vbo_colors_(0), vbo_uvs_(0), vertices_type(GL_TRIANGLES), local_modelview_matrix_(glm::mat4(1.0)), texture_id_(0), texture_flag_(false) {
     }
 
+    ~GLMesh() {
+      glDeleteBuffers(1, &vbo_vertices_);
+      glDeleteBuffers(1, &vbo_colors_);
+      glDeleteBuffers(1, &vbo_uvs_);
+    }
+
     void Translate(const glm::vec3 &translation_vector) {
       local_modelview_matrix_ = glm::translate(local_modelview_matrix_, translation_vector);
     }
