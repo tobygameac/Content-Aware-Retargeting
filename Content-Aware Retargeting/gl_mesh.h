@@ -37,18 +37,21 @@ namespace ContentAwareRetargeting {
 
     void Upload() {
       if (vertices_.size()) {
+        glDeleteBuffers(1, &vbo_vertices_);
         glGenBuffers(1, &vbo_vertices_);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices_);
         glBufferData(GL_ARRAY_BUFFER, vertices_.size() * sizeof(vertices_[0]), vertices_.data(), GL_STATIC_DRAW);
       }
 
       if (colors_.size()) {
+        glDeleteBuffers(1, &vbo_colors_);
         glGenBuffers(1, &vbo_colors_);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_colors_);
         glBufferData(GL_ARRAY_BUFFER, colors_.size() * sizeof(colors_[0]), colors_.data(), GL_STATIC_DRAW);
       }
 
       if (uvs_.size()) {
+        glDeleteBuffers(1, &vbo_uvs_);
         glGenBuffers(1, &vbo_uvs_);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_uvs_);
         glBufferData(GL_ARRAY_BUFFER, uvs_.size() * sizeof(uvs_[0]), uvs_.data(), GL_STATIC_DRAW);
