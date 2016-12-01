@@ -58,15 +58,6 @@ namespace ContentAwareRetargeting {
     target_height_numeric_up_down_->ValueChanged += gcnew System::EventHandler(this, &ContentAwareRetargeting::GLForm::OnNumericUpDownValueChanged);
   }
 
-  bool GLForm::ParseFileIntoString(const std::string &file_path, std::string &file_string) {
-    std::ifstream file_stream(file_path);
-    if (!file_stream.is_open()) {
-      return false;
-    }
-    file_string = std::string(std::istreambuf_iterator<char>(file_stream), std::istreambuf_iterator<char>());
-    return true;
-  }
-
   void GLForm::InitializeOpenGL() {
 
     // Get Handle
@@ -114,90 +105,7 @@ namespace ContentAwareRetargeting {
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-    std::string vertex_shader_string;
-    std::string fragment_shader_string;
-
-    ParseFileIntoString(DEFAULT_VERTEX_SHADER_FILE_PATH, vertex_shader_string);
-    ParseFileIntoString(DEFAULT_FRAGMENT_SHADER_FILE_PATH, fragment_shader_string);
-
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    const GLchar *vertex_shader_pointer = (const GLchar*)vertex_shader_string.c_str();
-    glShaderSource(vertex_shader, 1, &vertex_shader_pointer, NULL);
-    glCompileShader(vertex_shader);
-
-    int shader_compile_status;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &shader_compile_status);
-    if (shader_compile_status != GL_TRUE) {
-      std::cerr << "Could not compile the shader " << DEFAULT_VERTEX_SHADER_FILE_PATH << " .\n";
-    }
-
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    const GLchar *fragment_shader_pointer = (const GLchar*)fragment_shader_string.c_str();
-    glShaderSource(fragment_shader, 1, &fragment_shader_pointer, NULL);
-    glCompileShader(fragment_shader);
-
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &shader_compile_status);
-    if (shader_compile_status != GL_TRUE) {
-      std::cerr << "Could not compile the shader " << DEFAULT_FRAGMENT_SHADER_FILE_PATH << " .\n";
-    }
-
-    shader_program_id = glCreateProgram();
-    glAttachShader(shader_program_id, vertex_shader);
-    glAttachShader(shader_program_id, fragment_shader);
-    glLinkProgram(shader_program_id);
-
-    int shader_link_status;
-    glGetProgramiv(shader_program_id, GL_LINK_STATUS, &shader_link_status);
-    if (shader_link_status != GL_TRUE) {
-      std::cerr << "Could not link the shader.\n";
-    }
-
-    int shader_validate_status;
-    glValidateProgram(shader_program_id);
-    glGetProgramiv(shader_program_id, GL_VALIDATE_STATUS, &shader_validate_status);
-    if (shader_validate_status != GL_TRUE) {
-      std::cerr << "Could not validate the shader.\n";
-    }
-
-    shader_attribute_vertex_position_id = glGetAttribLocation(shader_program_id, SHADER_ATTRIBUTE_VERTEX_POSITION_NAME.c_str());
-    if (shader_attribute_vertex_position_id == -1) {
-      std::cerr << "Could not bind attribute " << SHADER_ATTRIBUTE_VERTEX_POSITION_NAME << ".\n";
-    }
-
-    shader_attribute_vertex_color_id = glGetAttribLocation(shader_program_id, SHADER_ATTRIBUTE_VERTEX_COLOR_NAME.c_str());
-    if (shader_attribute_vertex_color_id == -1) {
-      std::cerr << "Could not bind attribute " << SHADER_ATTRIBUTE_VERTEX_COLOR_NAME << ".\n";
-    }
-
-    shader_attribute_vertex_uv_id = glGetAttribLocation(shader_program_id, SHADER_ATTRIBUTE_VERTEX_UV_NAME.c_str());
-    if (shader_attribute_vertex_uv_id == -1) {
-      std::cerr << "Could not bind attribute " << SHADER_ATTRIBUTE_VERTEX_UV_NAME << ".\n";
-    }
-
-    shader_uniform_modelview_matrix_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_MODELVIEW_MATRIX_NAME.c_str());
-    if (shader_uniform_modelview_matrix_id == -1) {
-      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_MODELVIEW_MATRIX_NAME << ".\n";
-    }
-
-    shader_uniform_view_matrix_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_VIEW_MATRIX_NAME.c_str());
-    if (shader_uniform_view_matrix_id == -1) {
-      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_VIEW_MATRIX_NAME << ".\n";
-    }
-
-    shader_uniform_projection_matrix_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_PROJECTION_MATRIX_NAME.c_str());
-    if (shader_uniform_projection_matrix_id == -1) {
-      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_PROJECTION_MATRIX_NAME << ".\n";
-    }
-
-    shader_uniform_texture_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_TEXTURE_NAME.c_str());
-    if (shader_uniform_texture_id == -1) {
-      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_TEXTURE_NAME << ".\n";
-    }
-
-    shader_uniform_texture_flag_id = glGetUniformLocation(shader_program_id, SHADER_UNIFORM_TEXTURE_FLAG_NAME.c_str());
-    if (shader_uniform_texture_flag_id == -1) {
-      std::cerr << "Could not bind uniform " << SHADER_UNIFORM_TEXTURE_FLAG_NAME << ".\n";
-    }
+    gl_shader.CreateDefaultShader();
   }
 
   void GLForm::RenderGLPanel() {
@@ -213,10 +121,10 @@ namespace ContentAwareRetargeting {
 
     glm::mat4 modelview_matrix = glm::mat4(1.0f);
 
-    glUseProgram(shader_program_id);
+    glUseProgram(gl_shader.shader_program_id_);
 
-    glUniformMatrix4fv(shader_uniform_projection_matrix_id, 1, GL_FALSE, glm::value_ptr(projection_matrix));
-    glUniformMatrix4fv(shader_uniform_view_matrix_id, 1, GL_FALSE, glm::value_ptr(view_matrix));
+    glUniformMatrix4fv(gl_shader.shader_uniform_projection_matrix_id_, 1, GL_FALSE, glm::value_ptr(projection_matrix));
+    glUniformMatrix4fv(gl_shader.shader_uniform_view_matrix_id_, 1, GL_FALSE, glm::value_ptr(view_matrix));
 
     if (is_demo_triangle) {
 
@@ -224,14 +132,14 @@ namespace ContentAwareRetargeting {
         gl_panel_image_triangle_mesh.texture_flag_ = false;
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-        gl_panel_image_triangle_mesh.Draw(modelview_matrix);
+        gl_panel_image_triangle_mesh.Draw(gl_shader, modelview_matrix);
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         gl_panel_image_triangle_mesh.texture_flag_ = true;        
       }
 
       if (show_image_check_box_->Checked) {
-        gl_panel_image_triangle_mesh.Draw(modelview_matrix);
+        gl_panel_image_triangle_mesh.Draw(gl_shader, modelview_matrix);
       }
 
     } else {
@@ -240,14 +148,14 @@ namespace ContentAwareRetargeting {
         gl_panel_image_mesh.texture_flag_ = false;
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-        gl_panel_image_mesh.Draw(modelview_matrix);
+        gl_panel_image_mesh.Draw(gl_shader, modelview_matrix);
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         gl_panel_image_mesh.texture_flag_ = true;
       }
 
       if (show_image_check_box_->Checked) {
-        gl_panel_image_mesh.Draw(modelview_matrix);
+        gl_panel_image_mesh.Draw(gl_shader, modelview_matrix);
       }
     }
 
@@ -314,11 +222,12 @@ namespace ContentAwareRetargeting {
 
     for (size_t r = 0; r < mesh_row_count; ++r) {
       for (size_t c = 0; c < mesh_column_count; ++c) {
-        target_graph.vertices_.push_back(glm::vec2(c * real_mesh_width, r * real_mesh_height));
+        target_graph.vertices_.emplace_back(glm::vec2(c * real_mesh_width, r * real_mesh_height));
       }
     }
 
     target_mesh = GLMesh();
+
     target_mesh.vertices_type = GL_QUADS;
 
     for (size_t r = 0; r < mesh_row_count - 1; ++r) {
@@ -326,25 +235,25 @@ namespace ContentAwareRetargeting {
         std::vector<size_t> vertex_indices;
 
         size_t base_index = r * mesh_column_count + c;
-        vertex_indices.push_back(base_index);
-        vertex_indices.push_back(base_index + mesh_column_count);
-        vertex_indices.push_back(base_index + mesh_column_count + 1);
-        vertex_indices.push_back(base_index + 1);
+        vertex_indices.emplace_back(base_index);
+        vertex_indices.emplace_back(base_index + mesh_column_count);
+        vertex_indices.emplace_back(base_index + mesh_column_count + 1);
+        vertex_indices.emplace_back(base_index + 1);
 
         if (!c) {
-          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[1])));
+          target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[1])));
         }
 
-        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[1], vertex_indices[2])));
-        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[3], vertex_indices[2])));
+        target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[1], vertex_indices[2])));
+        target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[3], vertex_indices[2])));
 
         if (!r) {
-          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[3])));
+          target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[3])));
         }
 
         for (const size_t vertex_index : vertex_indices) {
-          target_mesh.vertices_.push_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0.0f));
-          target_mesh.uvs_.push_back(glm::vec2(target_graph.vertices_[vertex_index].x / (float)image.size().width, target_graph.vertices_[vertex_index].y / (float)image.size().height));
+          target_mesh.vertices_.emplace_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0.0f));
+          target_mesh.uvs_.emplace_back(glm::vec2(target_graph.vertices_[vertex_index].x / (float)image.size().width, target_graph.vertices_[vertex_index].y / (float)image.size().height));
         }
       }
     }
@@ -386,9 +295,9 @@ namespace ContentAwareRetargeting {
       for (int j = 0; j < out.numberofcorners; ++j) {
         int target_vertex_index = out.trianglelist[i * out.numberofcorners + j];
         glm::vec3 vertex(out.pointlist[target_vertex_index * 2], out.pointlist[target_vertex_index * 2 + 1], 0);
-        target_mesh.vertices_.push_back(vertex);
+        target_mesh.vertices_.emplace_back(vertex);
         glm::vec2 uv(vertex.x / (double)image.size().width, vertex.y / (double)image.size().height);
-        target_mesh.uvs_.push_back(uv);
+        target_mesh.uvs_.emplace_back(uv);
       }
     }
 
@@ -425,11 +334,11 @@ namespace ContentAwareRetargeting {
 
       // Calculate the saliency value of each patch
       for (size_t r = 0; r < source_image.size().height; ++r) {
-        saliency_map[r].push_back(saliency_map[r].back());
-        group_of_pixel[r].push_back(group_of_pixel[r].back());
+        saliency_map[r].emplace_back(saliency_map[r].back());
+        group_of_pixel[r].emplace_back(group_of_pixel[r].back());
       }
-      saliency_map.push_back(saliency_map.back());
-      group_of_pixel.push_back(group_of_pixel.back());
+      saliency_map.emplace_back(saliency_map.back());
+      group_of_pixel.emplace_back(group_of_pixel.back());
 
       saliency_of_patch = std::vector<double>((source_image.size().width + 1) * (source_image.size().height + 1));
       std::vector<int> group_count((source_image.size().width + 1) * (source_image.size().height + 1));
@@ -516,18 +425,18 @@ namespace ContentAwareRetargeting {
         std::vector<size_t> vertex_indices;
 
         size_t base_index = r * (mesh_column_count)+c;
-        vertex_indices.push_back(base_index);
-        vertex_indices.push_back(base_index + mesh_column_count);
-        vertex_indices.push_back(base_index + mesh_column_count + 1);
-        vertex_indices.push_back(base_index + 1);
+        vertex_indices.emplace_back(base_index);
+        vertex_indices.emplace_back(base_index + mesh_column_count);
+        vertex_indices.emplace_back(base_index + mesh_column_count + 1);
+        vertex_indices.emplace_back(base_index + 1);
 
         for (const auto &vertex_index : vertex_indices) {
-          gl_panel_image_mesh.vertices_.push_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
+          gl_panel_image_mesh.vertices_.emplace_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
         }
       }
     }
 
-    gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+    gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 1));
 
     GLTexture::SetGLTexture(source_image, &gl_panel_image_mesh.texture_id_);
 
@@ -594,7 +503,7 @@ namespace ContentAwareRetargeting {
 
         if (std::fstream(source_video_file_directory + video_frame_segmentation_name_oss.str()).good()) {
           cv::Mat segmented_frame = cv::imread(source_video_file_directory + video_frame_segmentation_name_oss.str());
-          //source_video_frames_after_segmentation.push_back(segmented_frame.clone());
+          //source_video_frames_after_segmentation.emplace_back(segmented_frame.clone());
           for (size_t r = 0; r < segmented_frame.size().height; ++r) {
             for (size_t c = 0; c < segmented_frame.size().width; ++c) {
               size_t pixel_group = Vec3bToValue(segmented_frame.at<cv::Vec3b>(r, c));
@@ -749,13 +658,13 @@ namespace ContentAwareRetargeting {
           std::vector<size_t> vertex_indices;
 
           size_t base_index = r * (mesh_column_count)+c;
-          vertex_indices.push_back(base_index);
-          vertex_indices.push_back(base_index + mesh_column_count);
-          vertex_indices.push_back(base_index + mesh_column_count + 1);
-          vertex_indices.push_back(base_index + 1);
+          vertex_indices.emplace_back(base_index);
+          vertex_indices.emplace_back(base_index + mesh_column_count);
+          vertex_indices.emplace_back(base_index + mesh_column_count + 1);
+          vertex_indices.emplace_back(base_index + 1);
 
           for (const auto &vertex_index : vertex_indices) {
-            gl_panel_image_mesh.vertices_.push_back(glm::vec3(frames_graph[t].vertices_[vertex_index].x, frames_graph[t].vertices_[vertex_index].y, 0));
+            gl_panel_image_mesh.vertices_.emplace_back(glm::vec3(frames_graph[t].vertices_[vertex_index].x, frames_graph[t].vertices_[vertex_index].y, 0));
           }
         }
       }
@@ -823,13 +732,13 @@ namespace ContentAwareRetargeting {
         std::vector<size_t> vertex_indices;
 
         size_t base_index = r * (mesh_column_count)+c;
-        vertex_indices.push_back(base_index);
-        vertex_indices.push_back(base_index + mesh_column_count);
-        vertex_indices.push_back(base_index + mesh_column_count + 1);
-        vertex_indices.push_back(base_index + 1);
+        vertex_indices.emplace_back(base_index);
+        vertex_indices.emplace_back(base_index + mesh_column_count);
+        vertex_indices.emplace_back(base_index + mesh_column_count + 1);
+        vertex_indices.emplace_back(base_index + 1);
 
         for (const auto &vertex_index : vertex_indices) {
-          gl_panel_image_mesh.vertices_.push_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
+          gl_panel_image_mesh.vertices_.emplace_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
         }
       }
     }
@@ -907,7 +816,7 @@ namespace ContentAwareRetargeting {
         //is_demo_triangle = true;
 
         //ChangeProgramStatus(ProgramStatus::IMAGE_RETARGETING);
-        ChangeProgramStatus(ProgramStatus::IMAGE_FOCUS);
+        //ChangeProgramStatus(ProgramStatus::IMAGE_FOCUS);
       }
 
     } else if (sender == open_video_file_tool_strip_menu_item_) {
@@ -932,7 +841,7 @@ namespace ContentAwareRetargeting {
         cv::Mat video_frame;
 
         while (video_capture.read(video_frame)) {
-          source_video_frames.push_back(video_frame.clone());
+          source_video_frames.emplace_back(video_frame.clone());
         }
 
         if (source_video_frames.size()) {
@@ -943,7 +852,7 @@ namespace ContentAwareRetargeting {
 
           BuildGridMeshAndGraphForImage(source_video_frames[0], gl_panel_image_mesh, image_graph, current_grid_size);
 
-          gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+          gl_panel_image_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_mesh.vertices_.size(), glm::vec3(0, 0, 1));
 
           GLTexture::SetGLTexture(source_video_frames[0], &gl_panel_image_mesh.texture_id_);
 
@@ -1035,7 +944,7 @@ namespace ContentAwareRetargeting {
       if (is_demo_triangle) {
         BuildTriangleMesh(source_image, gl_panel_image_triangle_mesh, current_grid_size * 10);
 
-        gl_panel_image_triangle_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_triangle_mesh.vertices_.size(), glm::vec3(0, 0, 255));
+        gl_panel_image_triangle_mesh.colors_ = std::vector<glm::vec3>(gl_panel_image_triangle_mesh.vertices_.size(), glm::vec3(0, 0, 1));
 
         GLTexture::SetGLTexture(source_image, &gl_panel_image_triangle_mesh.texture_id_);
         gl_panel_image_triangle_mesh.Upload();
@@ -1083,6 +992,12 @@ namespace ContentAwareRetargeting {
       ChangeGLPanelSize(gl_panel_->Width + 1, gl_panel_->Height);
       break;
     case Keys::L:
+      // Checking memory status
+      for (glm::vec3 &color : gl_panel_image_mesh.colors_) {
+        color = glm::vec3(rand() / (double)RAND_MAX, rand() / (double)RAND_MAX, rand() / (double)RAND_MAX);
+      }
+      gl_panel_image_mesh.Upload();
+      // Checking memory status
       show_lines_check_box_->Checked = !show_lines_check_box_->Checked;
       break;
     case Keys::T:

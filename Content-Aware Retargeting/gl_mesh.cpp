@@ -1,130 +1,143 @@
+#pragma once
+
 #include "gl_mesh.h"
 
 namespace ContentAwareRetargeting {
 
-  extern GLint shader_program_id;
-  extern GLint shader_attribute_vertex_position_id;
-  extern GLint shader_attribute_vertex_color_id;
-  extern GLint shader_attribute_vertex_uv_id;
-  extern GLint shader_uniform_modelview_matrix_id;
-  extern GLint shader_uniform_view_matrix_id;
-  extern GLint shader_uniform_projection_matrix_id;
-  extern GLint shader_uniform_texture_id;
-  extern GLint shader_uniform_texture_flag_id;
+  GLMesh::GLMesh() : vbo_vertices_(0), vbo_colors_(0), vbo_uvs_(0), vertices_type(GL_TRIANGLES), local_modelview_matrix_(glm::mat4(1.0)), texture_id_(0), texture_flag_(false) {
+  }
 
-  class GLMesh {
+  GLMesh::GLMesh(const GLMesh &other) {
+    DeepCopy(other);
+  }
 
-  public:
+  GLMesh::~GLMesh() {
+    //if (vbo_vertices_) {
+    //  glDeleteBuffers(1, &vbo_vertices_);
+    //}
+    //if (vbo_colors_) {
+    //  glDeleteBuffers(1, &vbo_colors_);
+    //}
+    //if (vbo_uvs_) {
+    //  glDeleteBuffers(1, &vbo_uvs_);
+    //}
+  }
 
-    GLMesh() : vbo_vertices_(0), vbo_colors_(0), vbo_uvs_(0), vertices_type(GL_TRIANGLES), local_modelview_matrix_(glm::mat4(1.0)), texture_id_(0), texture_flag_(false) {
-    }
+  GLMesh &GLMesh::operator=(const GLMesh &other) {
+    DeepCopy(other);
+    return *this;
+  }
 
-    void Translate(const glm::vec3 &translation_vector) {
-      local_modelview_matrix_ = glm::translate(local_modelview_matrix_, translation_vector);
-    }
+  void GLMesh::DeepCopy(const GLMesh &other) {
+    vertices_ = other.vertices_;
+    colors_ = other.colors_;
+    uvs_ = other.uvs_;
 
-    void Upload() {
-      if (vertices_.size()) {
+    texture_flag_ = other.texture_flag_;
+
+    texture_id_ = other.texture_id_;
+
+    local_modelview_matrix_ = other.local_modelview_matrix_;
+
+    vbo_vertices_ = vbo_colors_ = vbo_uvs_ = 0;
+
+    this->Upload();
+  }
+
+  void GLMesh::Translate(const glm::vec3 &translation_vector) {
+    local_modelview_matrix_ = glm::translate(local_modelview_matrix_, translation_vector);
+  }
+
+  void GLMesh::Upload() {
+    if (vertices_.size()) {
+      if (!vbo_vertices_) {
         glGenBuffers(1, &vbo_vertices_);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices_);
-        glBufferData(GL_ARRAY_BUFFER, vertices_.size() * sizeof(vertices_[0]), vertices_.data(), GL_STATIC_DRAW);
       }
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices_);
+      glBufferData(GL_ARRAY_BUFFER, vertices_.size() * sizeof(vertices_[0]), vertices_.data(), GL_STATIC_DRAW);
+    }
 
-      if (colors_.size()) {
+    if (colors_.size()) {
+      if (!vbo_colors_) {
         glGenBuffers(1, &vbo_colors_);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_colors_);
-        glBufferData(GL_ARRAY_BUFFER, colors_.size() * sizeof(colors_[0]), colors_.data(), GL_STATIC_DRAW);
       }
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_colors_);
+      glBufferData(GL_ARRAY_BUFFER, colors_.size() * sizeof(colors_[0]), colors_.data(), GL_STATIC_DRAW);
+    }
 
-      if (uvs_.size()) {
+    if (uvs_.size()) {
+      if (!vbo_uvs_) {
         glGenBuffers(1, &vbo_uvs_);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_uvs_);
-        glBufferData(GL_ARRAY_BUFFER, uvs_.size() * sizeof(uvs_[0]), uvs_.data(), GL_STATIC_DRAW);
       }
-
-      texture_flag_ = uvs_.size();
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_uvs_);
+      glBufferData(GL_ARRAY_BUFFER, uvs_.size() * sizeof(uvs_[0]), uvs_.data(), GL_STATIC_DRAW);
     }
 
-    void Clear() {
-      vertices_.clear();
-      colors_.clear();
-      uvs_.clear();
-      local_modelview_matrix_ = glm::mat4(1.0);
-      texture_id_ = 0;
+    texture_flag_ = uvs_.size();
+  }
 
-      vbo_vertices_ = vbo_colors_ = vbo_uvs_ = 0;
+  void GLMesh::Clear() {
+    vertices_.clear();
+    colors_.clear();
+    uvs_.clear();
+    local_modelview_matrix_ = glm::mat4(1.0);
+    texture_id_ = 0;
 
-      Upload();
+    vbo_vertices_ = vbo_colors_ = vbo_uvs_ = 0;
+
+    Upload();
+  }
+
+  void GLMesh::Draw(const GLShader &gl_shader) const {
+    Draw(gl_shader, glm::mat4(1.0f));
+  }
+
+  void GLMesh::Draw(const GLShader &gl_shader, const glm::mat4 &parent_modelview_matrix) const {
+
+    if (vbo_vertices_) {
+      glEnableVertexAttribArray(gl_shader.shader_attribute_vertex_position_id_);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices_);
+      glVertexAttribPointer(gl_shader.shader_attribute_vertex_position_id_, 3, GL_FLOAT, GL_FALSE, 0, 0);
     }
 
-    void Draw() {
-      Draw(glm::mat4(1.0f));
+    if (vbo_colors_) {
+      glEnableVertexAttribArray(gl_shader.shader_attribute_vertex_color_id_);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_colors_);
+      glVertexAttribPointer(gl_shader.shader_attribute_vertex_color_id_, 3, GL_FLOAT, GL_FALSE, 0, 0);
     }
 
-    void Draw(const glm::mat4 &parent_modelview_matrix) {
-
-      if (vbo_vertices_) {
-        glEnableVertexAttribArray(shader_attribute_vertex_position_id);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices_);
-        glVertexAttribPointer(shader_attribute_vertex_position_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
-      }
-
-      if (vbo_colors_) {
-        glEnableVertexAttribArray(shader_attribute_vertex_color_id);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_colors_);
-        glVertexAttribPointer(shader_attribute_vertex_color_id, 3, GL_FLOAT, GL_FALSE, 0, 0);
-      }
-
-      if (vbo_uvs_) {
-        glEnableVertexAttribArray(shader_attribute_vertex_uv_id);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_uvs_);
-        glVertexAttribPointer(shader_attribute_vertex_uv_id, 2, GL_FLOAT, GL_FALSE, 0, 0);
-      }
-
-      if (texture_flag_) {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture_id_);
-        glUniform1i(shader_uniform_texture_id, 0);
-      }
-
-      glUniform1f(shader_uniform_texture_flag_id, texture_flag_ ? 1.0 : 0.0);
-
-      glm::mat4 modelview_matrix = parent_modelview_matrix * local_modelview_matrix_;
-
-      glUniformMatrix4fv(shader_uniform_modelview_matrix_id, 1, GL_FALSE, glm::value_ptr(modelview_matrix));
-
-      glDrawArrays(vertices_type, 0, vertices_.size());
-
-      if (vbo_vertices_) {
-        glDisableVertexAttribArray(shader_attribute_vertex_position_id);
-      }
-
-      if (vbo_colors_) {
-        glDisableVertexAttribArray(shader_attribute_vertex_color_id);
-      }
-
-      if (vbo_uvs_) {
-        glDisableVertexAttribArray(shader_attribute_vertex_uv_id);
-      }
-
+    if (vbo_uvs_) {
+      glEnableVertexAttribArray(gl_shader.shader_attribute_vertex_uv_id_);
+      glBindBuffer(GL_ARRAY_BUFFER, vbo_uvs_);
+      glVertexAttribPointer(gl_shader.shader_attribute_vertex_uv_id_, 2, GL_FLOAT, GL_FALSE, 0, 0);
     }
 
-    std::vector<glm::vec3> vertices_;
-    std::vector<glm::vec3> colors_;
-    std::vector<glm::vec2> uvs_;
+    if (texture_flag_) {
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, texture_id_);
+      glUniform1i(gl_shader.shader_uniform_texture_id_, 0);
+    }
 
-    GLuint texture_id_;
-    GLuint vertices_type;
+    glUniform1f(gl_shader.shader_uniform_texture_flag_id_, texture_flag_ ? 1.0 : 0.0);
 
-  private:
+    glm::mat4 modelview_matrix = parent_modelview_matrix * local_modelview_matrix_;
 
-    GLuint vbo_vertices_;
-    GLuint vbo_colors_;
-    GLuint vbo_uvs_;
+    glUniformMatrix4fv(gl_shader.shader_uniform_modelview_matrix_id_, 1, GL_FALSE, glm::value_ptr(modelview_matrix));
 
-    bool texture_flag_;
+    glDrawArrays(vertices_type, 0, vertices_.size());
 
-    glm::mat4 local_modelview_matrix_;
-  };
+    if (vbo_vertices_) {
+      glDisableVertexAttribArray(gl_shader.shader_attribute_vertex_position_id_);
+    }
+
+    if (vbo_colors_) {
+      glDisableVertexAttribArray(gl_shader.shader_attribute_vertex_color_id_);
+    }
+
+    if (vbo_uvs_) {
+      glDisableVertexAttribArray(gl_shader.shader_attribute_vertex_uv_id_);
+    }
+
+  }
 
 }

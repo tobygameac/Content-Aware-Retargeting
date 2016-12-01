@@ -164,7 +164,7 @@ namespace ContentAwareRetargeting {
         size_t group_1 = Vec3bToValue(segmentation_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index_1].y, target_graph.vertices_[vertex_index_1].x));
         size_t group_2 = Vec3bToValue(segmentation_video_frame.at<cv::Vec3b>(target_graph.vertices_[vertex_index_2].y, target_graph.vertices_[vertex_index_2].x));
         
-        edge_index_list_of_object[group_1].push_back(edge_index);
+        edge_index_list_of_object[group_1].emplace_back(edge_index);
 
         if (object_saliency.find(group_1) == object_saliency.end()) {
           first_appear_group_list.insert(group_1);
@@ -175,7 +175,7 @@ namespace ContentAwareRetargeting {
         }
 
         if (group_1 != group_2) {
-          edge_index_list_of_object[group_2].push_back(edge_index);
+          edge_index_list_of_object[group_2].emplace_back(edge_index);
 
           if (object_saliency.find(group_2) == object_saliency.end()) {
             first_appear_group_list.insert(group_2);
@@ -403,10 +403,10 @@ namespace ContentAwareRetargeting {
       int group_of_y = group_of_pixel[target_graph.vertices_[vertex_index_2].y][target_graph.vertices_[vertex_index_2].x];
 
       if (group_of_x == group_of_y) {
-        edge_index_list_of_patch[group_of_x].push_back(edge_index);
+        edge_index_list_of_patch[group_of_x].emplace_back(edge_index);
       } else {
-        edge_index_list_of_patch[group_of_x].push_back(edge_index);
-        edge_index_list_of_patch[group_of_y].push_back(edge_index);
+        edge_index_list_of_patch[group_of_x].emplace_back(edge_index);
+        edge_index_list_of_patch[group_of_y].emplace_back(edge_index);
       }
     }
 

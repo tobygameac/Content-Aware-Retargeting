@@ -144,6 +144,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="gl_form.cpp" />
+    <ClCompile Include="gl_mesh.cpp" />
+    <ClCompile Include="gl_shader.cpp" />
     <ClCompile Include="triangle.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -152,6 +154,7 @@
       <FileType>CppForm</FileType>
     </ClInclude>
     <ClInclude Include="gl_mesh.h" />
+    <ClInclude Include="gl_shader.h" />
     <ClInclude Include="gl_texture.h" />
     <ClInclude Include="graph.h" />
     <ClInclude Include="saliency.h" />
@@ -167,8 +170,8 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\shader\fragment_shader.glsl" />
-    <None Include="..\shader\vertex_shader.glsl" />
+    <None Include="..\shaders\fragment_shader.glsl" />
+    <None Include="..\shaders\vertex_shader.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

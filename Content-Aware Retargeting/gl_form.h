@@ -45,28 +45,7 @@ namespace ContentAwareRetargeting {
 
   ProgramStatus program_status;
 
-  const std::string DEFAULT_VERTEX_SHADER_FILE_PATH = "..\\shader\\vertex_shader.glsl";
-  const std::string DEFAULT_FRAGMENT_SHADER_FILE_PATH = "..\\shader\\fragment_shader.glsl";
-
-  const std::string SHADER_ATTRIBUTE_VERTEX_POSITION_NAME = "vertex_position";
-  const std::string SHADER_ATTRIBUTE_VERTEX_COLOR_NAME = "vertex_color";
-  const std::string SHADER_ATTRIBUTE_VERTEX_UV_NAME = "vertex_uv";
-
-  const std::string SHADER_UNIFORM_MODELVIEW_MATRIX_NAME = "modelview_matrix";
-  const std::string SHADER_UNIFORM_VIEW_MATRIX_NAME = "view_matrix";
-  const std::string SHADER_UNIFORM_PROJECTION_MATRIX_NAME = "projection_matrix";
-  const std::string SHADER_UNIFORM_TEXTURE_NAME = "texture";
-  const std::string SHADER_UNIFORM_TEXTURE_FLAG_NAME = "texture_flag";
-
-  GLint shader_program_id;
-  GLint shader_attribute_vertex_position_id;
-  GLint shader_attribute_vertex_color_id;
-  GLint shader_attribute_vertex_uv_id;
-  GLint shader_uniform_modelview_matrix_id;
-  GLint shader_uniform_view_matrix_id;
-  GLint shader_uniform_projection_matrix_id;
-  GLint shader_uniform_texture_id;
-  GLint shader_uniform_texture_flag_id;
+  GLShader gl_shader;
 
   const float FOVY = 45.0f;
 
@@ -158,11 +137,9 @@ namespace ContentAwareRetargeting {
 
   private:
 
-    static HWND hwnd;
-    static HDC hdc;
-    static HGLRC hrc;
-
-    static bool ParseFileIntoString(const std::string &file_path, std::string &file_string);
+    HWND hwnd;
+    HDC hdc;
+    HGLRC hrc;
 
     void InitializeOpenGL();
 
