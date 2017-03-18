@@ -11,16 +11,16 @@ namespace ContentAwareRetargeting {
     DeepCopy(other);
   }
 
-  GLMesh::~GLMesh() {
-    //if (vbo_vertices_) {
-    //  glDeleteBuffers(1, &vbo_vertices_);
-    //}
-    //if (vbo_colors_) {
-    //  glDeleteBuffers(1, &vbo_colors_);
-    //}
-    //if (vbo_uvs_) {
-    //  glDeleteBuffers(1, &vbo_uvs_);
-    //}
+  GLMesh::~GLMesh()  {
+    if (vbo_vertices_) {
+      glDeleteBuffers(1, &vbo_vertices_);
+    }
+    if (vbo_colors_) {
+      glDeleteBuffers(1, &vbo_colors_);
+    }
+    if (vbo_uvs_) {
+      glDeleteBuffers(1, &vbo_uvs_);
+    }
   }
 
   GLMesh &GLMesh::operator=(const GLMesh &other) {

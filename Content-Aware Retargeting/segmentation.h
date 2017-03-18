@@ -23,7 +23,7 @@ namespace ContentAwareRetargeting {
 
     for (int r = 0; r < image.size().height; ++r) {
       for (int c = 0; c < image.size().width; ++c) {
-        target_graph.vertices_.emplace_back(glm::vec2(c, r));
+        target_graph.vertices_.push_back(glm::vec2(c, r));
 
         size_t index = r * image.size().width + c;
 
@@ -41,7 +41,7 @@ namespace ContentAwareRetargeting {
 
             double edge_weight = sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
 
-            target_graph.edges_.emplace_back(Edge(e, edge_weight));
+            target_graph.edges_.push_back(Edge(e, edge_weight));
           }
         }
       }

@@ -135,7 +135,7 @@ namespace ContentAwareRetargeting {
         gl_panel_image_triangle_mesh.Draw(gl_shader, modelview_matrix);
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        gl_panel_image_triangle_mesh.texture_flag_ = true;        
+        gl_panel_image_triangle_mesh.texture_flag_ = true;
       }
 
       if (show_image_check_box_->Checked) {
@@ -222,7 +222,7 @@ namespace ContentAwareRetargeting {
 
     for (size_t r = 0; r < mesh_row_count; ++r) {
       for (size_t c = 0; c < mesh_column_count; ++c) {
-        target_graph.vertices_.emplace_back(glm::vec2(c * real_mesh_width, r * real_mesh_height));
+        target_graph.vertices_.push_back(glm::vec2(c * real_mesh_width, r * real_mesh_height));
       }
     }
 
@@ -235,32 +235,32 @@ namespace ContentAwareRetargeting {
         std::vector<size_t> vertex_indices;
 
         size_t base_index = r * mesh_column_count + c;
-        vertex_indices.emplace_back(base_index);
-        vertex_indices.emplace_back(base_index + mesh_column_count);
-        vertex_indices.emplace_back(base_index + mesh_column_count + 1);
-        vertex_indices.emplace_back(base_index + 1);
+        vertex_indices.push_back(base_index);
+        vertex_indices.push_back(base_index + mesh_column_count);
+        vertex_indices.push_back(base_index + mesh_column_count + 1);
+        vertex_indices.push_back(base_index + 1);
 
         if (!c) {
-          target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[1])));
+          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[1])));
         }
 
-        target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[1], vertex_indices[2])));
-        target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[3], vertex_indices[2])));
+        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[1], vertex_indices[2])));
+        target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[3], vertex_indices[2])));
 
         if (!r) {
-          target_graph.edges_.emplace_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[3])));
+          target_graph.edges_.push_back(Edge(std::make_pair(vertex_indices[0], vertex_indices[3])));
         }
 
         for (const size_t vertex_index : vertex_indices) {
-          target_mesh.vertices_.emplace_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0.0f));
-          target_mesh.uvs_.emplace_back(glm::vec2(target_graph.vertices_[vertex_index].x / (float)image.size().width, target_graph.vertices_[vertex_index].y / (float)image.size().height));
+          target_mesh.vertices_.push_back(glm::vec3(target_graph.vertices_[vertex_index].x, target_graph.vertices_[vertex_index].y, 0.0f));
+          target_mesh.uvs_.push_back(glm::vec2(target_graph.vertices_[vertex_index].x / (float)image.size().width, target_graph.vertices_[vertex_index].y / (float)image.size().height));
         }
       }
     }
   }
 
   void GLForm::BuildTriangleMesh(const cv::Mat &image, GLMesh &target_mesh, const float triangle_size) {
-    
+
     triangulateio in, out;
 
     memset(&in, 0, sizeof(triangulateio));
@@ -295,9 +295,9 @@ namespace ContentAwareRetargeting {
       for (int j = 0; j < out.numberofcorners; ++j) {
         int target_vertex_index = out.trianglelist[i * out.numberofcorners + j];
         glm::vec3 vertex(out.pointlist[target_vertex_index * 2], out.pointlist[target_vertex_index * 2 + 1], 0);
-        target_mesh.vertices_.emplace_back(vertex);
+        target_mesh.vertices_.push_back(vertex);
         glm::vec2 uv(vertex.x / (double)image.size().width, vertex.y / (double)image.size().height);
-        target_mesh.uvs_.emplace_back(uv);
+        target_mesh.uvs_.push_back(uv);
       }
     }
 
@@ -333,24 +333,32 @@ namespace ContentAwareRetargeting {
       saliency_map_of_source_image = CalculateContextAwareSaliencyMapWithMatlabProgram(source_image, saliency_map, source_image_file_directory + source_image_file_name, source_image_file_directory + "saliency_" + source_image_file_name + ".png");
 
       // Calculate the saliency value of each patch
-      for (size_t r = 0; r < source_image.size().height; ++r) {
-        saliency_map[r].emplace_back(saliency_map[r].back());
-        group_of_pixel[r].emplace_back(group_of_pixel[r].back());
+      for (int r = 0; r < source_image.rows; ++r) {
+        saliency_map[r].push_back(saliency_map[r].back());
+        group_of_pixel[r].push_back(group_of_pixel[r].back());
       }
-      saliency_map.emplace_back(saliency_map.back());
-      group_of_pixel.emplace_back(group_of_pixel.back());
+      saliency_map.push_back(saliency_map.back());
+      group_of_pixel.push_back(group_of_pixel.back());
 
-      saliency_of_patch = std::vector<double>((source_image.size().width + 1) * (source_image.size().height + 1));
-      std::vector<int> group_count((source_image.size().width + 1) * (source_image.size().height + 1));
-      for (int r = 0; r < source_image.size().height + 1; ++r) {
-        for (int c = 0; c < source_image.size().width + 1; ++c) {
+      int group_size = 0;
+      for (int r = 0; r < (source_image.rows + 1); ++r) {
+        for (int c = 0; c < (source_image.cols + 1); ++c) {
+          group_size = std::max(group_size, group_of_pixel[r][c]);
+        }
+      }
+      ++group_size;
+
+      saliency_of_patch = std::vector<double>(group_size);
+      std::vector<int> group_count(group_size);
+      for (int r = 0; r < (source_image.rows + 1); ++r) {
+        for (int c = 0; c < (source_image.cols + 1); ++c) {
           ++group_count[group_of_pixel[r][c]];
           saliency_of_patch[group_of_pixel[r][c]] += saliency_map[r][c];
         }
       }
 
       double min_saliency = 2e9, max_saliency = -2e9;
-      for (size_t patch_index = 0; patch_index < saliency_of_patch.size(); ++patch_index) {
+      for (int patch_index = 0; patch_index < group_size; ++patch_index) {
         if (group_count[patch_index]) {
           saliency_of_patch[patch_index] /= (double)group_count[patch_index];
         }
@@ -359,13 +367,13 @@ namespace ContentAwareRetargeting {
       }
 
       // Normalize saliency values
-      for (size_t patch_index = 0; patch_index < saliency_of_patch.size(); ++patch_index) {
+      for (int patch_index = 0; patch_index < group_size; ++patch_index) {
         saliency_of_patch[patch_index] = (saliency_of_patch[patch_index] - min_saliency) / (max_saliency - min_saliency);
       }
 
       significance_map_of_source_image = cv::Mat(source_image.size(), source_image.type());
-      for (size_t r = 0; r < source_image.size().height; ++r) {
-        for (size_t c = 0; c < source_image.size().width; ++c) {
+      for (int r = 0; r < source_image.rows; ++r) {
+        for (int c = 0; c < source_image.cols; ++c) {
           double vertex_saliency = saliency_of_patch[group_of_pixel[r][c]];
           significance_map_of_source_image.at<cv::Vec3b>(r, c) = SaliencyValueToSignifanceColor(vertex_saliency);
         }
@@ -425,13 +433,13 @@ namespace ContentAwareRetargeting {
         std::vector<size_t> vertex_indices;
 
         size_t base_index = r * (mesh_column_count)+c;
-        vertex_indices.emplace_back(base_index);
-        vertex_indices.emplace_back(base_index + mesh_column_count);
-        vertex_indices.emplace_back(base_index + mesh_column_count + 1);
-        vertex_indices.emplace_back(base_index + 1);
+        vertex_indices.push_back(base_index);
+        vertex_indices.push_back(base_index + mesh_column_count);
+        vertex_indices.push_back(base_index + mesh_column_count + 1);
+        vertex_indices.push_back(base_index + 1);
 
         for (const auto &vertex_index : vertex_indices) {
-          gl_panel_image_mesh.vertices_.emplace_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
+          gl_panel_image_mesh.vertices_.push_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
         }
       }
     }
@@ -503,7 +511,7 @@ namespace ContentAwareRetargeting {
 
         if (std::fstream(source_video_file_directory + video_frame_segmentation_name_oss.str()).good()) {
           cv::Mat segmented_frame = cv::imread(source_video_file_directory + video_frame_segmentation_name_oss.str());
-          //source_video_frames_after_segmentation.emplace_back(segmented_frame.clone());
+          //source_video_frames_after_segmentation.push_back(segmented_frame.clone());
           for (size_t r = 0; r < segmented_frame.size().height; ++r) {
             for (size_t c = 0; c < segmented_frame.size().width; ++c) {
               size_t pixel_group = Vec3bToValue(segmented_frame.at<cv::Vec3b>(r, c));
@@ -658,13 +666,13 @@ namespace ContentAwareRetargeting {
           std::vector<size_t> vertex_indices;
 
           size_t base_index = r * (mesh_column_count)+c;
-          vertex_indices.emplace_back(base_index);
-          vertex_indices.emplace_back(base_index + mesh_column_count);
-          vertex_indices.emplace_back(base_index + mesh_column_count + 1);
-          vertex_indices.emplace_back(base_index + 1);
+          vertex_indices.push_back(base_index);
+          vertex_indices.push_back(base_index + mesh_column_count);
+          vertex_indices.push_back(base_index + mesh_column_count + 1);
+          vertex_indices.push_back(base_index + 1);
 
           for (const auto &vertex_index : vertex_indices) {
-            gl_panel_image_mesh.vertices_.emplace_back(glm::vec3(frames_graph[t].vertices_[vertex_index].x, frames_graph[t].vertices_[vertex_index].y, 0));
+            gl_panel_image_mesh.vertices_.push_back(glm::vec3(frames_graph[t].vertices_[vertex_index].x, frames_graph[t].vertices_[vertex_index].y, 0));
           }
         }
       }
@@ -732,13 +740,13 @@ namespace ContentAwareRetargeting {
         std::vector<size_t> vertex_indices;
 
         size_t base_index = r * (mesh_column_count)+c;
-        vertex_indices.emplace_back(base_index);
-        vertex_indices.emplace_back(base_index + mesh_column_count);
-        vertex_indices.emplace_back(base_index + mesh_column_count + 1);
-        vertex_indices.emplace_back(base_index + 1);
+        vertex_indices.push_back(base_index);
+        vertex_indices.push_back(base_index + mesh_column_count);
+        vertex_indices.push_back(base_index + mesh_column_count + 1);
+        vertex_indices.push_back(base_index + 1);
 
         for (const auto &vertex_index : vertex_indices) {
-          gl_panel_image_mesh.vertices_.emplace_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
+          gl_panel_image_mesh.vertices_.push_back(glm::vec3(image_graph.vertices_[vertex_index].x, image_graph.vertices_[vertex_index].y, 0));
         }
       }
     }
@@ -815,7 +823,7 @@ namespace ContentAwareRetargeting {
 
         //is_demo_triangle = true;
 
-        //ChangeProgramStatus(ProgramStatus::IMAGE_RETARGETING);
+        ChangeProgramStatus(ProgramStatus::IMAGE_RETARGETING);
         //ChangeProgramStatus(ProgramStatus::IMAGE_FOCUS);
       }
 
@@ -841,7 +849,7 @@ namespace ContentAwareRetargeting {
         cv::Mat video_frame;
 
         while (video_capture.read(video_frame)) {
-          source_video_frames.emplace_back(video_frame.clone());
+          source_video_frames.push_back(video_frame.clone());
         }
 
         if (source_video_frames.size()) {
